@@ -1,0 +1,4 @@
+(executable
+ (name blogger)
+ (promote (until-clean))
+ (libraries preface wordpress))
