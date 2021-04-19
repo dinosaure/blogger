@@ -28,10 +28,14 @@ init:
 	git submodule add https://github.com/xhtmlboi/xhtmlboi.github.io capsule
 
 publish:
+	./src/blogger.exe
 	git submodule update --remote --merge
 	rsync -avr --delete  _site/ capsule/
 	cd capsule \
 	  && git checkout main \
 	  && git add . \
-	  && git commit -m $(MSG) \
-	  && git push
+	  && git commit -m "PFIOOOOOU" -m $(MSG) \
+	  && git push origin main
+	git add capsule
+	git commit -m "deploy" -m $(MSG)
+	git push
