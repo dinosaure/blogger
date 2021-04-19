@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+      XHTMLBoy's website
+      {{#title}}- {{.}}{{/title}}
+      {{^title}}{{#article_title}}- {{.}}{{/article_title}}{{/title}}
+    </title>
+    {{#description}}
+    <meta name="description" content="{{.}}">
+    {{/description}}
+    <link href="/css/style.css" rel="stylesheet">
+  </head>
+  <body>
+    <header>
+      <h1>XHTMLBoy's Website</h1>
+      <blockquote>
+        You are on a website dedicated to the enthusiasts of
+        (valid) <strong>XHTML</strong>, and of <strong>beautiful
+        mechanics</strong>.
+      </blockquote>
+    </header>
+    <main>
+      {{{body}}}
+    </main>
+    <footer>
+      <a  href="https://github.com/xhtmlboi/wordpress">
+        Powered by <strong>WordPress</strong>
+      </a>
+      <br />
+      <a class="valid" href="https://validator.w3.org/check?uri=https%3A%2F%2Fxhmlboi.github.io&charset=%28detect+automatically%29&doctype=Inline&group=0">
+        HTML5
+      </a>
+      <a class="valid" href="https://jigsaw.w3.org/css-validator/validator?uri=https%3A%2F%2Fxhmlboi.github.io%2Fcss%2Fstyle.css&profile=css3svg&usermedium=all&warning=1&vextwarning=&lang=en">CSS3</a>
+    </footer>
+  </body>
+</html>
+

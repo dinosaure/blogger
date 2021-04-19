@@ -1,0 +1,133 @@
+/* Stolen from xvw.github.io */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+/* It is so obvious that it is surprising that it is not the default
+   behaviour! */
+
+body {
+  margin: 32px;
+  padding: 0;
+  max-width: 840px;
+  background-color: #fff;
+  color: #444444;
+  font-family: sans-serif;
+}
+
+h1,h2,h3{ line-height:1.2 }
+
+header {
+  margin-bottom: 32px;
+}
+
+header h1 {
+  margin: 0;
+  font-weight: 900;
+}
+
+header h1::before,
+header h1::after {
+  color: #a3a1a8;
+  font-weight: 100;
+}
+
+header h1::before {
+  content: "<h1>";
+}
+header h1::after {
+  content: "</h1>";
+}
+
+header blockquote {
+  padding: 0;
+  margin: 0;
+}
+
+main {
+    margin: 42px 0px;
+    line-height: 1.6;
+}
+
+footer {
+    padding-top: 32px;
+}
+
+.list-articles > li { margin-bottom: 12px; }
+.list-articles > li > span.date { color: #a3a1a8; }    
+.list-articles > li > p { padding: 0; margin: 0 }
+
+article pre {
+    background-color: #f2f2f2;
+    margin: 32px 16px;
+    padding: 16px;
+    font-family: monospace, monospace;
+    font-size: 1.2em;
+    line-height: 0.8;
+    
+}
+
+article img {
+    display: block;
+    margin: 32px auto;
+}
+
+article code {
+    font-size: 1.2em;
+}
+
+article pre code {
+    font-size: 1em;
+}
+
+.valid {
+    display: inline-block;
+    margin: 32px 0;
+    border: 2px solid #444444;
+    color: #444444;
+    font-weight: 900;
+    font-size: 0.8em;
+    text-decoration: none;
+    text-transform: uppercase;
+    padding: 4px 4px 4px 1.5em;
+    position: relative;
+}
+
+.valid::before {
+    content: '';
+    position: absolute;
+    border-color: #009933;
+    border-style: solid;
+    border-width: 0 0.3em 0.25em 0;
+    height: 1em;
+    top: 1.3em;
+    left: 0.6em;
+    margin-top: -1em;
+    transform: rotate(58deg);
+    width: 0.5em;
+}
+
+@media screen and (max-width: 720px) {
+  header h1 {
+    margin-left: 32px;
+  }
+
+  header h1::before,
+  header h1::after {
+    margin-left: -32px;
+    display: block;
+  }
+
+  header .banner {
+      display: none;
+  }
+
+  header blockquote {
+    margin-top: 16px;
+  }
+
+  main blockquote {
+      margin: 4px;
+  }
+}
