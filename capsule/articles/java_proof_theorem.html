@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+      XHTMLBoy's website
+      
+      - Implementing a minimalist mathematical statement prover with Java
+    </title>
+    <link href="/css/style.css" rel="stylesheet">
+  </head>
+  <body>
+    <header>
+      <h1>XHTMLBoy's Website</h1>
+      <blockquote>
+        You are on a website dedicated to the enthusiasts of
+        (valid) <strong>XHTML</strong>, and of <strong>beautiful
+        mechanics</strong>.
+      </blockquote>
+    </header>
+    <main>
+      <a href="/index.html">Back to index</a>
+
+<article>
+  <h2>Implementing a minimalist mathematical statement prover with Java</h2>
+  <blockquote>
+<p>Proving things, like mathematical expressions, is serious
+business. But in general, the theory behind attempted <em>automatic
+proving</em> is often barbarically complex. To demystify the exercise, I
+decided that my first article would be about writing an automatic
+demonstrator of mathematical expressions, in Java, because Java
+Champions (which I dream of becoming) write programs in Java.</p>
+</blockquote>
+<p>To prove a mathematical statement, it is first important to be able to
+describe in which <strong>system of axioms</strong> the statement is to be
+validated. Next, it is necessary to describe the <strong>model</strong> used. And
+yes, even if one would like each axiomatized theory to lead to only
+one model... this is unfortunately not the case. Typically, there are
+several models that validate <a href="https://it.wikipedia.org/wiki/Assiomi_di_Peano">Peano's
+arithmetic</a>.</p>
+<p>Thus, to provide a <em>flexible automatic prover</em>, the class describing
+the <em>validation engine</em> will need to be <strong>parametrised</strong> by several
+other classes. Either, cleverly use <strong>parametric polymorphism</strong> (the
+<em>intellectual</em> name of <em>Generics</em>, probably what a Java Champion would
+say). Well, we can broadly sketch the outline of our prover! For this,
+we will describe them in an <strong>interface</strong>!</p>
+<pre><code class="language-java">package io.github.xhtmlboi;
+
+import java.util.Optional;
+
+public interface Prover&lt;Axioms, Model, Statement&gt;  {
+
+    Axioms getAxioms();
+    Model getModel();
+
+    /**
+     * A statement that must be verified in the given axioms,
+     * for the given model
+     * @param st the statement
+     * @return Returns an optional containing the result of
+     *         the statement validation. (true for valid, false
+     *         for invalid), if the optional is empty, the
+     *          statement could not be validated or refuted.
+     */
+    Optional&lt;Boolean&gt; run(Statement st);
+}
+</code></pre>
+<p>Well this is strange! Why return an optional boolean
+(<code>Optional&lt;Boolean&gt;</code>)? A statement is valid or not, what a shame! Here
+is a very <strong>detailed</strong> diagram of what <em>we would like</em>:</p>
+<p><img src="/images/proof-aut.png" alt="a pretty ambitious goal" /></p>
+<p>But in <strong>1936</strong>, on the basis of the incomprehensible (for the
+<em>not-Java-Champion</em> that I am) paper &quot;<strong><em>Über formal unentscheidbare
+Sätze der Principia Mathematica und verwandter Systeme</em></strong>&quot; written by
+<a href="https://de.wikipedia.org/wiki/Kurt_G%C3%B6del">Kurt Gödel</a> in 1931,
+<a href="https://en.wikipedia.org/wiki/Alonzo_Church">Alonzo Church</a> and <a href="https://en.wikipedia.org/wiki/Alan_Turing">Alan
+Turing</a> tackled the famous
+<strong><em>Entscheidungsproblem</em></strong> (<a href="https://de.wikipedia.org/wiki/Gottfried_Wilhelm_Leibniz">Gottfried Wilhelm
+Leibniz</a>,
+yeah, the guy behind the monads, nah not those from the category
+theory, others, about <em>soul stuff</em>). This leads to some rather
+annoying problems, <em>or at least sets in stone</em> that some dreams (of
+<a href="https://de.wikipedia.org/wiki/David_Hilbert">Hildebert</a>'s for
+example) will remain dreams <strong>forever</strong>. Transforming our perspectives
+in this way:</p>
+<p><img src="/images/proof.png" alt="What a mess" /></p>
+<p>Now you should understand (unless you were a Java Champion and you
+would have already understood) why use an option?</p>
+<ul>
+<li><code>result.get() == true</code> the statement is <strong>valid</strong>;
+</li>
+<li><code>result.get() == false</code> the statement is <strong>invalid</strong>;
+</li>
+<li><code>result.isEmpty()</code> the prover <strong>cannot</strong> validate the statement.
+</li>
+</ul>
+<p>But what about the <strong>nonterminaison</strong>? Just think about it... if we
+<strong>can't prove that a program terminates</strong>... how could we ask our
+statement checker to tell us that the statement does not terminate?
+But don't panic, the concrete implementation I will give you can
+<strong>never</strong> nonterminate! Without further ado, here is a class that
+implements our interface, let me introduce &quot;<strong>Ein Super Automatischer
+Prüfer Der Immer Fertig Wird</strong>&quot; (Some will notice how I want to avoid
+controversy by deliberately choosing a name that has no ambiguous
+connotations in another language. A little tip, if you want to find a
+name for a project and you absolutely want to avoid offending someone,
+or a whole community... nothing could be easier, translate a sentence
+into German):</p>
+<pre><code class="language-java">package io.github.xhtmlboi;
+
+import java.util.Optional;
+
+public class EinSuperAutomatischerPrüferDerImmerFertigWird&lt;Axioms, Model, Statement&gt; 
+        implements Prover&lt;Axioms, Model, Statement&gt; {
+
+    protected Axioms axioms;
+    protected Model model;
+    
+    public EinSuperAutomatischerPrüferDerImmerFertigWird(Axioms axioms, Model model) {
+        this.axioms = axioms;
+        this.model = model;
+    }
+
+    @Override
+    public Axioms getAxioms() {
+        return this.axioms;
+    }
+
+    @Override
+    public Model getModel() {
+        return this.model;
+    }
+
+    @Override
+    public Optional&lt;Boolean&gt; run(Statement st) {
+        return Optional.empty();
+    }
+}
+</code></pre>
+<p>To avoid the risk of evaluating a statement that may not
+finish... just don't evaluate it and always return an acceptable
+answer: &quot;<strong>I don't know</strong>&quot;. According to Gödel, Church and
+Turing... this answer is <strong>quite acceptable</strong> (sometimes... but all the
+time is &quot;<em>a kind of sometimes</em>&quot;).</p>
+<p>It's great, by respecting all the principles of <strong>Clean Code</strong>, using
+a hint of design pattern and showing an uncommon intelligence, we
+have, in few lines (which, in Java is a feat), succeeded in building a
+very formal software that always returns the <strong>right answer</strong>. The
+least I can say is that <strong>Java excels at this kind of exercise</strong>! You
+should use it often. Another positive point is that this software can
+probably run on any machine (provided it has a JVM installation
+compatible with the byte code of the distributed software). And, even
+more <em>deep</em>, because the verification algorithm is so clear, it is
+possible <strong>to run it without a JVM</strong>*... and even without a computer. For
+example... close your eyes, think very hard about a mathematical
+statement, <strong>then simply say to yourself that you have no idea of the
+validity of that statement</strong>. <em>So far so good</em>.</p>
+<p>To conclude... is this software useful? Probably not for
+<em>intelligently</em> checking mathematical statements or programs. But it
+has the merit to demonstrate my quality as a Java programmer and my
+<strong>eligibility to become a Champion</strong>. Although the lack of explicit
+sums (as opposed to products) forces me to use an optional, rather
+than an explcite sum: <code>Valid | Invalid | Dont_know</code>, but hey, that's
+just functional programmer's flair.</p>
+<p>I hope you enjoyed reading this, and see you soon for new articles!</p>
+
+</article>
+
+    </main>
+    <footer>
+      <a  href="https://github.com/xhtmlboi/wordpress">
+        Powered by <strong>WordPress</strong>
+      </a>
+      <br />
+      <a class="valid" href="https://validator.w3.org/check?uri=https%3A%2F%2Fxhtmlboi.github.io&charset=%28detect+automatically%29&doctype=Inline&group=0">
+        HTML5
+      </a>
+      <a class="valid" href="https://jigsaw.w3.org/css-validator/validator?uri=https%3A%2F%2Fxhtmlboi.github.io%2Fcss%2Fstyle.css&profile=css3svg&usermedium=all&warning=1&vextwarning=&lang=en">CSS3</a>
+    </footer>
+  </body>
+</html>
+
