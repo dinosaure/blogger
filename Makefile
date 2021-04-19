@@ -30,5 +30,5 @@ init:
 publish:
 	./src/blogger.exe
 	git submodule update --remote --merge
-	rsync -avr --delete  _site/ ../xhtmlboi.github.io
+	rsync -avr --delete --exclude-from '.rsync-discard'  _site/ ../xhtmlboi.github.io
 	(cd ../xhtmlboi.github.io; git add .;  git commit -m "PFIOOOOOU" -m $(MSG); git push origin main)
