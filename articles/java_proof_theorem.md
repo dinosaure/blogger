@@ -148,7 +148,7 @@ should use it often. Another positive point is that this software can
 probably run on any machine (provided it has a JVM installation
 compatible with the byte code of the distributed software). And, even
 more *deep*, because the verification algorithm is so clear, it is
-possible **to run it without a JVM***... and even without a computer. For
+possible **to run it without a JVM**... and even without a computer. For
 example... close your eyes, think very hard about a mathematical
 statement, **then simply say to yourself that you have no idea of the
 validity of that statement**. *So far so good*.
