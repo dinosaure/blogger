@@ -31,7 +31,7 @@ publish:
 	git submodule update --remote --merge
 	rsync -avr --delete  _site/ capsule/
 	cd capsule \
-	  && git checkout master \
+	  && git checkout main \
 	  && git add . \
-	  && git commit -m $(MSG)
+	  && git commit -m $(MSG) \
 	  && git push
