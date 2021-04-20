@@ -65,12 +65,15 @@ article pre {
     font-family: monospace, monospace;
     font-size: 1.2em;
     line-height: 0.8;
+    width: 100%;
+    overflow-x: auto;
     
 }
 
 article img {
     display: block;
     margin: 32px auto;
+    max-width: 100%;
 }
 
 article code {

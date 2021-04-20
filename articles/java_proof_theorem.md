@@ -159,7 +159,11 @@ has the merit to demonstrate my quality as a Java programmer and my
 **eligibility to become a Champion**. Although the lack of explicit
 sums (as opposed to products) forces me to use an optional, rather
 than an explcite sum: `Valid | Invalid | Dont_know`, but hey, that's
-just functional programmer's flair.
+just functional programmer's flair (and yes, I am aware of the
+existence of enums, but I find that even if it would have been
+possible to represent the form I am proposing, it would have, firstly,
+spoiled the substance of my article and apart from this aspect, they
+propose a rather limited version of sums).
 
 I hope you enjoyed reading this, and see you soon for new articles!
 
