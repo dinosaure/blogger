@@ -1,4 +1,4 @@
 (executable
  (name blogger)
  (promote (until-clean))
- (libraries preface wordpress))
+ (libraries preface yocaml yocaml_unix))

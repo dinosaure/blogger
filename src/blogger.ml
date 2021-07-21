@@ -1,4 +1,4 @@
-open Wordpress
+open Yocaml
 
 let target = "_site/"
 let articles_repository = "articles"
@@ -97,5 +97,5 @@ let () =
     let* () = articles in
     index
   in
-  execute program
+  Yocaml_unix.execute program
 ;;
