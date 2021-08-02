@@ -1,0 +1,36 @@
+opam-version: "2.0"
+version: "dev"
+synopsis: " The source code of the generator and the content of my blog, naively using YOCaml "
+maintainer: "xhtmlboi@gmail.com"
+authors: [ "The XHTMLBoy <xhtmlboi@gmail.com>" ]
+
+build: [
+  [ "dune" "subst" ]
+  [ "dune" "build" "-p" name "-j" jobs ]
+  [ "dune" "runtest" "-p" name ] {with-test}
+  [ "dune" "build" "@doc" "-p" name ] {with-doc}
+]
+
+license: "GPL-3.0-or-later"
+tags: [ "angry" "cuisine" "nerd" "ocaml" "preface" ]
+homepage: "https://github.com/xhtmlboi/blogger"
+dev-repo: "git://github.com/xhtmlboi/blogger.git"
+bug-reports: "https://github.com/xhtmlboi/blogger/issues"
+
+depends: [
+  "ocaml" { >= "4.11.1" }
+  "dune" { >= "2.8" }
+  "preface" {pinned}
+  "yocaml" {pinned}
+  "yocaml_unix" {pinned}
+  "yocaml_yaml" {pinned}
+  "yocaml_markdown" {pinned}
+]
+
+pin-depends: [
+  ["preface.dev" "git://github.com/xvw/preface.git"]
+  ["yocaml.dev" "git://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml_unix.dev" "git://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml_yaml.dev" "git://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml_markdown.dev" "git://github.com/xhtmlboi/yocaml.git"]
+]
