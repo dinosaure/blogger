@@ -1,5 +1,6 @@
 open Yocaml
 
+
 let target = "_site/"
 let articles_repository = "articles"
 let track_binary_update = Build.watch Sys.argv.(0)
@@ -38,8 +39,8 @@ let images =
 let prepare_article source =
   let open Build in
   track_binary_update
-  >>> read_file_with_metadata (module Metadata.Article) source
-  >>> snd process_markdown
+  >>> Yocaml_yaml.read_file_with_metadata (module Metadata.Article) source
+  >>> Yocaml_markdown.content_to_html ()
   >>> apply_as_template (module Metadata.Article) article_layout
   >>> apply_as_template (module Metadata.Article) global_layout
 ;;
@@ -55,35 +56,31 @@ let articles =
 
 let index =
   let open Build in
-  let* deps = read_child_files articles_repository is_markdown in
-  let task, effects =
-    fold_dependencies
-    $ List.map
-        (fun source ->
-          prepare_article source
-          >>^ Preface.Pair.fst
-          >>^ Preface.Pair.( & ) (get_article_url source)
-          >>^ Preface.Pair.swap)
-        deps
+  let* list_articles =
+    collection
+      (read_child_files "articles/" (with_extension "md"))
+      (fun source ->
+        track_binary_update
+        >>> Yocaml_yaml.read_file_with_metadata
+              (module Metadata.Article)
+              source
+        >>^ fun (x, _) -> x, get_article_url source)
+      (fun x meta content ->
+        x
+        |> Metadata.Articles.make
+             ?title:(Metadata.Page.title meta)
+             ?description:(Metadata.Page.description meta)
+        |> Metadata.Articles.sort_articles_by_date
+        |> fun x -> x, content)
   in
-  let list_articles =
-    task (fun (mt, content) ->
-        List.map (fun f -> f ()) effects
-        |> Traverse.sequence
-        >|= Metadata.Articles.make
-              ?title:(Metadata.Page.title mt)
-              ?description:(Metadata.Page.description mt)
-        >|= Metadata.Articles.sort_articles_by_date
-        >|= Preface.Pair.( & ) content
-        >|= Preface.Pair.swap)
-  in
+
   create_file
     (into target "index.html")
     (track_binary_update
-    >>> read_file_with_metadata
+    >>> Yocaml_yaml.read_file_with_metadata
           (module Metadata.Page)
           (into "pages" "index.md")
-    >>> snd process_markdown
+    >>> Yocaml_markdown.content_to_html ()
     >>> list_articles
     >>> apply_as_template (module Metadata.Articles) list_layout
     >>> apply_as_template (module Metadata.Articles) global_layout
