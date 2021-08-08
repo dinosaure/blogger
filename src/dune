@@ -1,4 +1,10 @@
 (executable
  (name blogger)
  (promote (until-clean))
- (libraries preface yocaml yocaml_yaml yocaml_markdown yocaml_unix))
+ (libraries
+  preface
+  yocaml
+  yocaml_yaml
+  yocaml_markdown
+  yocaml_unix
+  yocaml_mustache))

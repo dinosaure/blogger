@@ -16,7 +16,11 @@ body {
   font-family: sans-serif;
 }
 
-h1,h2,h3{ line-height:1.2 }
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+}
 
 header {
   margin-bottom: 32px;
@@ -46,69 +50,75 @@ header blockquote {
 }
 
 main {
-    margin: 42px 0px;
-    line-height: 1.6;
+  margin: 42px 0px;
+  line-height: 1.6;
 }
 
 footer {
-    padding-top: 32px;
+  padding-top: 32px;
 }
 
-.list-articles > li { margin-bottom: 12px; }
-.list-articles > li > span.date { color: #a3a1a8; }    
-.list-articles > li > p { padding: 0; margin: 0 }
+.list-articles > li {
+  margin-bottom: 12px;
+}
+.list-articles > li > span.date {
+  color: #a3a1a8;
+}
+.list-articles > li > p {
+  padding: 0;
+  margin: 0;
+}
 
 article pre {
-    background-color: #f2f2f2;
-    margin: 32px 16px;
-    padding: 16px;
-    font-family: monospace, monospace;
-    font-size: 1.2em;
-    line-height: 0.8;
-    width: 100%;
-    overflow-x: auto;
-    
+  background-color: #ffffff;
+  margin: 16px 8px;
+  padding: 8px;
+  font-family: monospace, monospace;
+  font-size: 1.2em;
+  line-height: 0.8;
+  width: 100%;
+  overflow-x: auto;
 }
 
 article img {
-    display: block;
-    margin: 32px auto;
-    max-width: 100%;
+  display: block;
+  margin: 32px auto;
+  max-width: 100%;
 }
 
 article code {
-    font-size: 1.2em;
+  font-size: 1.2em;
 }
 
 article pre code {
-    font-size: 1em;
+  font-size: 1em;
 }
 
 .valid {
-    display: inline-block;
-    margin: 20px 0;
-    border: 2px solid #444444;
-    color: #444444;
-    font-weight: 900;
-    font-size: 0.8em;
-    text-decoration: none;
-    text-transform: uppercase;
-    padding: 4px 4px 4px 1.5em;
-    position: relative;
+  display: inline-block;
+  margin: 20px 0;
+  border: 2px solid #444444;
+  color: #444444;
+  font-weight: 900;
+  font-size: 0.8em;
+  text-decoration: none;
+  text-transform: uppercase;
+  padding: 4px 4px 4px 1.5em;
+  position: relative;
 }
 
 .valid::before {
-    content: '';
-    position: absolute;
-    border-color: #009933;
-    border-style: solid;
-    border-width: 0 0.3em 0.25em 0;
-    height: 1em;
-    top: 1.3em;
-    left: 0.6em;
-    margin-top: -1em;
-    transform: rotate(58deg);
-    width: 0.5em;
+  content: "";
+  position: absolute;
+  border-color: #009933;
+  border-style: solid;
+  border-width: 0 0.3em 0.25em 0;
+  height: 1em;
+  top: 1.3em;
+  left: 0.6em;
+  margin-top: -1em;
+  transform: rotate(58deg);
+  width: 0.5em;
 }
 
 @media screen and (max-width: 720px) {
@@ -123,7 +133,7 @@ article pre code {
   }
 
   header .banner {
-      display: none;
+    display: none;
   }
 
   header blockquote {
@@ -131,6 +141,6 @@ article pre code {
   }
 
   main blockquote {
-      margin: 4px;
+    margin: 4px;
   }
 }

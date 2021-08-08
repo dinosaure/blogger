@@ -1,6 +1,5 @@
 open Yocaml
 
-
 let target = "_site/"
 let articles_repository = "articles"
 let track_binary_update = Build.watch Sys.argv.(0)
@@ -41,8 +40,12 @@ let prepare_article source =
   track_binary_update
   >>> Yocaml_yaml.read_file_with_metadata (module Metadata.Article) source
   >>> Yocaml_markdown.content_to_html ()
-  >>> apply_as_template (module Metadata.Article) article_layout
-  >>> apply_as_template (module Metadata.Article) global_layout
+  >>> Yocaml_mustache.apply_as_template
+        (module Metadata.Article)
+        article_layout
+  >>> Yocaml_mustache.apply_as_template
+        (module Metadata.Article)
+        global_layout
 ;;
 
 let articles =
@@ -73,7 +76,6 @@ let index =
         |> Metadata.Articles.sort_articles_by_date
         |> fun x -> x, content)
   in
-
   create_file
     (into target "index.html")
     (track_binary_update
@@ -82,8 +84,12 @@ let index =
           (into "pages" "index.md")
     >>> Yocaml_markdown.content_to_html ()
     >>> list_articles
-    >>> apply_as_template (module Metadata.Articles) list_layout
-    >>> apply_as_template (module Metadata.Articles) global_layout
+    >>> Yocaml_mustache.apply_as_template
+          (module Metadata.Articles)
+          list_layout
+    >>> Yocaml_mustache.apply_as_template
+          (module Metadata.Articles)
+          global_layout
     >>^ Preface.Pair.snd)
 ;;
 
