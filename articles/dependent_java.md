@@ -264,7 +264,7 @@ all my occurrences of `NullableInt` with `Optional<Integer>`. **Wow**.
 
 Incredible but the magic doesn't stop here. Indeed, it is possible to constrain
 the type of a type variable, using the syntax : `Class<T extends S>` which means
-the class `Class` is parameterised by a `T` **which must have a subtype** `S`.
+the class `Class` is parameterised by a `T` **which is a subtype of** `S`.
 It is called a "_Bounded Type Parameter_", but as I find the name unclear, I
 suggest using the term: "**type class**", because the type is constrained by a
 class (or an interface, but it is the same thing). It is also possible to add
