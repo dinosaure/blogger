@@ -285,7 +285,7 @@ refactoring. To summarise:
 
 Some people will tell me that **dependent types**, **type classes** and **type
 families** already exist in programming terminology but as mentioned previously
-**let's be honnest, who in real life wants to program using obscure Greek
+**let's be honest, who in real life wants to program using obscure Greek
 words?**
 
 I hope you enjoyed reading this, and see you soon for new articles!
