@@ -68,7 +68,7 @@ let index =
               (module Metadata.Article)
               source
         >>^ fun (x, _) -> x, get_article_url source)
-      (fun x meta content ->
+      (fun x (meta, content) ->
         x
         |> Metadata.Articles.make
              ?title:(Metadata.Page.title meta)
@@ -93,11 +93,44 @@ let index =
     >>^ Preface.Pair.snd)
 ;;
 
+let domain = "https://xhtmlboi.github.io"
+let feed_url = into domain "feed.xml"
+
+let rss_channel items () =
+  Rss.Channel.make
+    ~title:"XHTMLBoy's Website"
+    ~link:domain
+    ~feed_link:feed_url
+    ~description:
+      "You are on a website dedicated to the enthusiasts of (valid) XHTML, \
+       and of beautiful mechanics."
+    ~generator:"YOCaml"
+    ~webmaster:"xhtmlboi@gmail.com (The XHTMLBoy)"
+    items
+;;
+
+let feed =
+  let open Build in
+  let* rss =
+    collection
+      (read_child_files "articles/" (with_extension "md"))
+      (fun source ->
+        track_binary_update
+        >>> Yocaml_yaml.read_metadata (module Metadata.Article) source
+        >>^ Metadata.Article.to_rss_item (into domain $ get_article_url source))
+      rss_channel
+  in
+  create_file
+    (into target "feed.xml")
+    (track_binary_update >>> rss >>^ Rss.Channel.to_rss)
+;;
+
 let () =
   let program =
     let* () = css in
     let* () = images in
     let* () = articles in
+    let* () = feed in
     index
   in
   Yocaml_unix.execute program

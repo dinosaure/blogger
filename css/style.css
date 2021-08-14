@@ -121,6 +121,32 @@ article pre code {
   width: 0.5em;
 }
 
+.small-button {
+  display: inline-block;
+  margin: 4px 0;
+  font-weight: 900;
+  font-size: 0.7em;
+  text-decoration: none;
+  text-transform: uppercase;
+  padding: 2px 4px;
+  position: relative;
+}
+
+.rss {
+  background-color: #d94c1a;
+  color: #fff;
+}
+
+.twitter {
+  background-color: #506ad4;
+  color: #fff;
+}
+
+.github {
+  background-color: #111;
+  color: #fff;
+}
+
 @media screen and (max-width: 720px) {
   header h1 {
     margin-left: 32px;
