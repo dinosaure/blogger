@@ -5,13 +5,12 @@
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>
-        XHTMLBoy's website
-        {{#title}}- {{.}}{{/title}}
-        {{^title}}{{#article_title}}- {{.}}{{/article_title}}{{/title}}
+        XHTMLBoy's website {{#title}}- {{.}}{{/title}}{{^title}}{{#article_title}}- {{.}}{{/article_title}}{{/title}}
     </title>
     {{#description}}
     <meta name="description" content="{{.}}">
     {{/description}}
+    <link href="/css/fonts.css" rel="stylesheet">
     <link href="/css/style.css" rel="stylesheet">
     <link rel="alternate" type="application/rss+xml" href="/feed.xml" title="RSSBoy">
   </head>

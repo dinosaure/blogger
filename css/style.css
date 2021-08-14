@@ -13,7 +13,7 @@ body {
   max-width: 840px;
   background-color: #fff;
   color: #444444;
-  font-family: sans-serif;
+  font-family: "Roboto";
 }
 
 h1,
@@ -73,7 +73,7 @@ article pre {
   background-color: #ffffff;
   margin: 16px 8px;
   padding: 8px;
-  font-family: monospace, monospace;
+  font-family: "Roboto Mono";
   font-size: 1.2em;
   line-height: 0.8;
   width: 100%;
@@ -87,11 +87,14 @@ article img {
 }
 
 article code {
-  font-size: 1.2em;
+  font-size: 0.8em;
+  font-family: "Roboto Mono";
+  color: #024873;
+  font-weight: 400;
 }
 
 article pre code {
-  font-size: 1em;
+  font-size: 0.8em;
 }
 
 .valid {

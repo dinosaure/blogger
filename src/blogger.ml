@@ -29,6 +29,12 @@ let css =
   $ fun css_file -> copy_file css_file ~into:(into target "css")
 ;;
 
+let fonts =
+  let open Build in
+  process_files [ "fonts/" ] (fun _ -> true)
+  $ fun font_file -> copy_file font_file ~into:(into target "fonts")
+;;
+
 let images =
   let open Build in
   process_files [ "images/" ] is_images
@@ -127,6 +133,7 @@ let feed =
 
 let () =
   let program =
+    let* () = fonts in
     let* () = css in
     let* () = images in
     let* () = articles in
