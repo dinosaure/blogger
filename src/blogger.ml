@@ -1,4 +1,7 @@
 open Yocaml
+module Md = Yocaml_markdown
+module Meta = Yocaml_yaml
+module Tpl = Yocaml_jingoo
 
 let target = "_site/"
 let articles_repository = "articles"
@@ -44,14 +47,10 @@ let images =
 let prepare_article source =
   let open Build in
   track_binary_update
-  >>> Yocaml_yaml.read_file_with_metadata (module Metadata.Article) source
-  >>> Yocaml_markdown.content_to_html ()
-  >>> Yocaml_mustache.apply_as_template
-        (module Metadata.Article)
-        article_layout
-  >>> Yocaml_mustache.apply_as_template
-        (module Metadata.Article)
-        global_layout
+  >>> Meta.read_file_with_metadata (module Metadata.Article) source
+  >>> Md.content_to_html ()
+  >>> Tpl.apply_as_template (module Metadata.Article) article_layout
+  >>> Tpl.apply_as_template (module Metadata.Article) global_layout
 ;;
 
 let articles =
@@ -70,9 +69,7 @@ let index =
       (read_child_files "articles/" (with_extension "md"))
       (fun source ->
         track_binary_update
-        >>> Yocaml_yaml.read_file_with_metadata
-              (module Metadata.Article)
-              source
+        >>> Meta.read_file_with_metadata (module Metadata.Article) source
         >>^ fun (x, _) -> x, get_article_url source)
       (fun x (meta, content) ->
         x
@@ -85,17 +82,13 @@ let index =
   create_file
     (into target "index.html")
     (track_binary_update
-    >>> Yocaml_yaml.read_file_with_metadata
+    >>> Meta.read_file_with_metadata
           (module Metadata.Page)
           (into "pages" "index.md")
-    >>> Yocaml_markdown.content_to_html ()
+    >>> Md.content_to_html ()
     >>> list_articles
-    >>> Yocaml_mustache.apply_as_template
-          (module Metadata.Articles)
-          list_layout
-    >>> Yocaml_mustache.apply_as_template
-          (module Metadata.Articles)
-          global_layout
+    >>> Tpl.apply_as_template (module Metadata.Articles) list_layout
+    >>> Tpl.apply_as_template (module Metadata.Articles) global_layout
     >>^ Preface.Pair.snd)
 ;;
 
@@ -122,7 +115,7 @@ let feed =
       (read_child_files "articles/" (with_extension "md"))
       (fun source ->
         track_binary_update
-        >>> Yocaml_yaml.read_metadata (module Metadata.Article) source
+        >>> Meta.read_metadata (module Metadata.Article) source
         >>^ Metadata.Article.to_rss_item (into domain $ get_article_url source))
       rss_channel
   in

@@ -1,6 +1,13 @@
 <a href="/index.html">Back to index</a>
 
 <article>
-  <h2>{{article_title}}</h2>
-  {{{body}}}
+    <h2>{{ article_title }}</h2>
+    <ul class="tags-list">
+        {%- for tag in tags -%}
+        <li>{{ tag }}</li>
+        {%- endfor -%}
+    </ul>
+    {%- autoescape false -%}
+    {{ body }}
+    {% endautoescape -%}
 </article>

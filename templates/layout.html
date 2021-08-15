@@ -1,3 +1,20 @@
+{%- if article_title -%}
+{%- set dash = " - " -%}
+{%- set page_title = article_title -%}
+{%- elseif title -%}
+{%- set dash = " - " -%}
+{%- set page_title = title -%}
+{%- else -%}
+{%- set dash = "" -%}
+{%- set page_title = "" -%}
+{%- endif %}
+{% if article_description -%}
+{%- set page_description = article_description -%}
+{%- elseif description -%}
+{%- set page_description = description -%}
+{%- else -%}
+{%- set page_description = "XHTMLBoy's website" -%}
+{%- endif -%}
 <!doctype html>
 <html lang="en">
   <head>
@@ -5,11 +22,9 @@
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>
-        XHTMLBoy's website {{#title}}- {{.}}{{/title}}{{^title}}{{#article_title}}- {{.}}{{/article_title}}{{/title}}
+        XHTMLBoy's website{{ dash }}{{ page_title }}
     </title>
-    {{#description}}
-    <meta name="description" content="{{.}}">
-    {{/description}}
+    <meta name="description" content="{{ page_description }}">
     <link href="/css/fonts.css" rel="stylesheet">
     <link href="/css/style.css" rel="stylesheet">
     <link rel="alternate" type="application/rss+xml" href="/feed.xml" title="RSSBoy">
@@ -24,7 +39,9 @@
       </blockquote>
     </header>
     <main>
-        {{{body}}}
+        {%- autoescape false -%}
+        {{ body }}
+        {% endautoescape -%}
     </main>
     <footer>
         <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>

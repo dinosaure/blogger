@@ -89,7 +89,7 @@ article img {
 article code {
   font-size: 0.8em;
   font-family: "Roboto Mono";
-  color: #024873;
+  color: #333;
   font-weight: 400;
 }
 
@@ -148,6 +148,27 @@ article pre code {
 .github {
   background-color: #111;
   color: #fff;
+}
+
+article .tags-list {
+  padding: 0;
+  margin: 0;
+  margin-bottom: 32px;
+}
+
+article .tags-list > li {
+  display: inline-block;
+  background-color: #f2f2f2;
+  color: #333333;
+  margin: 2px;
+  padding: 2px 8px;
+  font-size: 0.8em;
+}
+
+article .tags-list > li::before {
+  content: "#";
+  color: #666;
+  margin-right: 2px;
 }
 
 @media screen and (max-width: 720px) {
