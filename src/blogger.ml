@@ -9,6 +9,7 @@ let track_binary_update = Build.watch Sys.argv.(0)
 let global_layout = into "templates" "layout.html"
 let article_layout = into "templates" "article.html"
 let list_layout = into "templates" "list_articles.html"
+let tags_layout = into "templates" "tags.html"
 let is_css = with_extension "css"
 
 let is_images =
@@ -69,8 +70,8 @@ let index =
       (read_child_files "articles/" (with_extension "md"))
       (fun source ->
         track_binary_update
-        >>> Meta.read_file_with_metadata (module Metadata.Article) source
-        >>^ fun (x, _) -> x, get_article_url source)
+        >>> Meta.read_metadata (module Metadata.Article) source
+        >>^ fun x -> x, get_article_url source)
       (fun x (meta, content) ->
         x
         |> Metadata.Articles.make
@@ -124,6 +125,49 @@ let feed =
     (track_binary_update >>> rss >>^ Rss.Channel.to_rss)
 ;;
 
+let tags =
+  let open Build in
+  let open Preface.Fun.Infix in
+  let extract_tags metas =
+    List.concat_map (Metadata.Article.tags % Stdlib.fst) metas
+    |> List.sort_uniq String.compare
+  in
+  let has_tag tag (meta, _) =
+    List.exists (String.equal tag) (Metadata.Article.tags meta)
+  in
+  let generate_tags_list tags metas =
+    List.map (fun tag -> tag, List.filter (has_tag tag) metas) tags
+  in
+  let* tags =
+    collection
+      (read_child_files "articles/" (with_extension "md"))
+      (fun source ->
+        track_binary_update
+        >>> Meta.read_metadata (module Metadata.Article) source
+        >>^ fun x -> x, get_article_url source)
+      (fun metas (meta, content) ->
+        let tags = extract_tags metas in
+        let group = generate_tags_list tags metas in
+        Tags.make
+          ?title:(Metadata.Page.title meta)
+          ?description:(Metadata.Page.description meta)
+          group
+        |> Tags.sort_by_quantity
+        |> fun x -> x, content)
+  in
+  create_file
+    (into target "tags.html")
+    (track_binary_update
+    >>> Meta.read_file_with_metadata
+          (module Metadata.Page)
+          (into "pages" "tags.md")
+    >>> Md.content_to_html ()
+    >>> tags
+    >>> Tpl.apply_as_template (module Tags) tags_layout
+    >>> Tpl.apply_as_template (module Tags) global_layout
+    >>^ Preface.Pair.snd)
+;;
+
 let () =
   let program =
     let* () = fonts in
@@ -131,6 +175,7 @@ let () =
     let* () = images in
     let* () = articles in
     let* () = feed in
+    let* () = tags in
     index
   in
   Yocaml_unix.execute program

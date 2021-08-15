@@ -97,6 +97,34 @@ article pre code {
   font-size: 0.8em;
 }
 
+.tag-box {
+  margin: 0;
+  margin-bottom: 32px;
+  padding-bottom: 12px;
+  color: #111;
+  display: none;
+}
+
+.tag-box > h3 {
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+}
+
+.tag-box > h3 > span {
+  padding: 2px 8px;
+  background-color: #111;
+  color: #fff;
+}
+
+.tag-box > h3 > span::before {
+  content: "#";
+}
+
+.tag-box:target {
+  display: block;
+}
+
 .valid {
   display: inline-block;
   margin: 20px 0;
@@ -150,13 +178,13 @@ article pre code {
   color: #fff;
 }
 
-article .tags-list {
+.tags-list {
   padding: 0;
   margin: 0;
   margin-bottom: 32px;
 }
 
-article .tags-list > li {
+.tags-list > li {
   display: inline-block;
   background-color: #f2f2f2;
   color: #333333;
@@ -165,10 +193,15 @@ article .tags-list > li {
   font-size: 0.8em;
 }
 
-article .tags-list > li::before {
+.tags-list > li::before {
   content: "#";
   color: #666;
   margin-right: 2px;
+}
+
+.tags-list > li > a {
+  color: #333333;
+  text-decoration: none;
 }
 
 @media screen and (max-width: 720px) {
