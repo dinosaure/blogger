@@ -17,7 +17,7 @@
     <h3>
         <span>{{ tag.tag }}</span>
         {{ nb_tags }}
-        {%- if nb_tags > 1 -%}entries{%- else %}entry{%- endif -%}
+        {%- if nb_tags > 1 %} entries{%- else %} entry{%- endif -%}
     </h3>
     <ul>
         {%- for article in tag.articles -%}
