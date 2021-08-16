@@ -69,6 +69,18 @@ footer {
   margin: 0;
 }
 
+article h2 {
+  font-size: 1.6em;
+}
+
+article h3 {
+  font-size: 1.4em;
+}
+
+article h4 {
+  font-size: 1.2em;
+}
+
 article pre {
   background-color: #ffffff;
   margin: 16px 8px;
@@ -87,7 +99,6 @@ article img {
 }
 
 article code {
-  font-size: 0.8em;
   font-family: "Roboto Mono";
   color: #333;
   font-weight: 400;

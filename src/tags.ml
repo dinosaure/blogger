@@ -11,11 +11,18 @@ let make ?title ?description tags = { tags; title; description }
 let sort_by_quantity ?(decreasing = true) p =
   { p with
     tags =
-      List.sort
-        (fun (_, a) (_, b) ->
+      List.sort (fun (_, a) (_, b) ->
           let r = Int.compare $ List.length a $ List.length b in
           if decreasing then ~-r else r)
-        p.tags
+      $ List.map
+          (fun (x, l) ->
+            ( x
+            , List.sort
+                (fun (a, _) (b, _) ->
+                  let r = Metadata.Article.compare_by_date a b in
+                  if decreasing then ~-r else r)
+                l ))
+          p.tags
   }
 ;;
 
