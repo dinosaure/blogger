@@ -98,10 +98,23 @@ article img {
   max-width: 100%;
 }
 
+.hljs,
 article code {
   font-family: "Roboto Mono";
-  color: #333;
-  font-weight: 400;
+  background-color: #ffffff;
+  line-height: 1.2em;
+}
+
+.hljs-built_in {
+  text-decoration: none;
+}
+
+.hljs-doctag,
+.hljs-formula,
+.hljs-symbol,
+.hljs-string {
+  background: none;
+  color: #666;
 }
 
 article pre code {

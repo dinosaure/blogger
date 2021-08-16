@@ -287,7 +287,7 @@ compare these two statements:
 type 'a normal =
    | Normal : 'a -> 'a normal
 
- type exist =
+ type exists =
    | Exist : 'a -> exist
 ```
 
@@ -295,7 +295,7 @@ In the first declaration, the type is **parametrized** by `'a`, so the variable
 appears on the left and right of the equation. In the second declaration, the
 variable does not escape from the signature, so **it denotes an existential
 type**. For example, `Normal 10` will have the type `int normal` and `Exists 10`
-aura le type `exist` (Yeah, no more _leaking_).
+aura le type `exists` (Yeah, no more _leaking_).
 
 In general, types that involve existentials imply having two additional
 functions, `pack`, which will **bury** our data in our type (which defines one
@@ -341,12 +341,12 @@ to describe existentials and here is an example partially similar to the one we
 described in OCaml:
 
 ```java
-// It could be AbstractBeanXmlAttribute
+// I could have named it AbstractBeanXmlAttribute
 interface XMLAttr {
   String toXMLAttr()
 }
 
-// It could be AbstractBeanXmlAttribute
+// I could have named it AbstractBeanXmlAttribute
 interface XMLContent {
   String toXMLContent()
 }
@@ -389,7 +389,9 @@ hence the famous _Blackbox analogy_) and provides a proof of the existence of a
 consumption strategy. This is exactly the "contract" part of an interface. As a
 result, it is possible to treat uniformly instances of different classes
 implementing the same interface (or several). This analogy between objects (and
-more generically, **abstract types**) has long been known (1988), indeed [Abstract types have existential type](https://homepages.inf.ed.ac.uk/gdp/publications/Abstract_existential.pdf).
+more generically, **abstract types**) has long been known (1988), indeed
+[Abstract types have existential
+type](https://homepages.inf.ed.ac.uk/gdp/publications/Abstract_existential.pdf).
 
 So, what can we learn from this article? Well... **that you already know the
 existential types**, it's just that you call them, _probably differently_.

@@ -11,6 +11,7 @@ let article_layout = into "templates" "article.html"
 let list_layout = into "templates" "list_articles.html"
 let tags_layout = into "templates" "tags.html"
 let is_css = with_extension "css"
+let is_javascript = with_extension "js"
 
 let is_images =
   let open Preface.Predicate in
@@ -31,6 +32,12 @@ let css =
   let open Build in
   process_files [ "css/" ] is_css
   $ fun css_file -> copy_file css_file ~into:(into target "css")
+;;
+
+let javascript =
+  let open Build in
+  process_files [ "js/" ] is_javascript
+  $ fun js_file -> copy_file js_file ~into:(into target "js")
 ;;
 
 let fonts =
@@ -171,6 +178,7 @@ let tags =
 let () =
   let program =
     let* () = fonts in
+    let* () = javascript in
     let* () = css in
     let* () = images in
     let* () = articles in
