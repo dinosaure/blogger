@@ -9,6 +9,7 @@ tags:
   - Java
   - Types
   - Indexation
+  - Sarcasm
 ---
 
 > Today, I present you with a powerful tip... so strong that I almost didn't

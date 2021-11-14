@@ -69,16 +69,29 @@ footer {
   margin: 0;
 }
 
+article h1 {
+  font-size: 1.8em;
+  margin: 20px 0;
+}
+
 article h2 {
   font-size: 1.6em;
+  margin-top: 64px;
 }
 
 article h3 {
   font-size: 1.4em;
+  margin-top: 32px;
 }
 
 article h4 {
   font-size: 1.2em;
+  margin-top: 16px;
+}
+
+article blockquote h4 {
+  margin-top: 34px;
+  margin-bottom: -16px;
 }
 
 article pre {

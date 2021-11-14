@@ -9,6 +9,7 @@ tags:
   - Java
   - Gödel
   - Proof
+  - Pseudo-sarcasm
 ---
 
 > Proving things, like mathematical expressions, is serious
