@@ -16,7 +16,7 @@ tags:
 > [Didier](https://twitter.com/dplaindoux), [Pierre](https://twitter.com/grimfw)
 > and [Xavier](https://twitter.com/vdwxv) (_that helped me so much in the
 > writing of this article and designing diagrams, that he could easily be
-> considered a co-author_) worked on **a very complicated library to do very
+> considered as co-author_) worked on **a very complicated library to do very
 > complicated things**: [Preface](https://github.com/xvw/preface/). As mentioned
 > in the README, the library is probably not very useful, but it allows you to
 > develop in a rather funny style with lots of modules and weird names. After
