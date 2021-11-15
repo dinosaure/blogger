@@ -1861,7 +1861,7 @@ In this article, we have briefly seen some of the details of how **an aspiring
 Java Champion** uses a library to generate, _unproductively_, his blog, through
 three axes:
 
-- How to abstract over effects using **Freer monad** and handlers (in \__Javaist_ words
+- How to abstract over effects using **Freer monad** and handlers (in _Javaist_ words
   "_how to use hexagonal architecture_ via "_the interpreter pattern_")
 - How to capture dependencies between tasks using **Kleisli Arrow** (and `Set`)
 - How to deal with metadata, _at user level_ (in _Javaist_ words "_how to deal
