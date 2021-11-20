@@ -1,0 +1,21 @@
+<a href="/index.html">Back to index</a>
+
+<ul class="tags-list aeration">
+    {%- for tag in tags -%}
+    <li><a href="/{{ tag.link  }}">{{ tag.name }} ({{ tag.number }})</a></li>
+    {%- endfor -%}
+</ul>
+
+<div class="tag-box" id="tag-{{ tag  }}">
+    {%- set nb_tags = length (articles) -%}
+    <h3>
+        <span>{{ tag }}</span>
+        {{ nb_tags }}
+        {%- if nb_tags > 1 %} entries{%- else %} entry{%- endif -%}
+    </h3>
+    <ul>
+        {%- for article in articles -%}
+        <li><a href="/{{ article.url }}">{{ article.article_title  }}</a></li>
+        {%- endfor -%}
+    </ul>
+</div>

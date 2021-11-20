@@ -4,7 +4,7 @@
     <h1>{{ article_title }}</h1>
     <ul class="tags-list">
         {%- for tag in tags -%}
-        <li><a href="/tags.html#tag-{{ tag  }}">{{ tag }}</a></li>
+        <li><a href="/tags/{{ tag  }}.html">{{ tag }}</a></li>
         {%- endfor -%}
     </ul>
     {%- autoescape false -%}

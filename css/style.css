@@ -139,7 +139,6 @@ article pre code {
   margin-bottom: 32px;
   padding-bottom: 12px;
   color: #111;
-  display: none;
 }
 
 .tag-box > h3 {
@@ -156,10 +155,6 @@ article pre code {
 
 .tag-box > h3 > span::before {
   content: "#";
-}
-
-.tag-box:target {
-  display: block;
 }
 
 .valid {
@@ -213,6 +208,10 @@ article pre code {
 .github {
   background-color: #111;
   color: #fff;
+}
+
+.aeration {
+  margin: 32px 0 !important;
 }
 
 .tags-list {
