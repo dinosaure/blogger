@@ -21,6 +21,8 @@ depends: [
   "ocaml" { >= "4.11.1" }
   "dune" { >= "2.8" }
   "preface" { >= "0.1.0" }
+  "logs" {>= "0.7.0" }
+  "cmdliner" { >= "1.0.0"}
   "yocaml" {pinned}
   "yocaml_unix" {pinned}
   "yocaml_yaml" {pinned}

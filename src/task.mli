@@ -1,3 +1,4 @@
+val target : Yocaml.Filepath.t
 val move_css : unit Yocaml.Effect.t
 val move_images : unit Yocaml.Effect.t
 val move_javascript : unit Yocaml.Effect.t

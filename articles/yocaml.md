@@ -929,7 +929,7 @@ as much detail as possible! _Stay tuned_.
 > correspondence with strong profonctions was formalised (and very nicely
 > summarised in the excellent "[Notions of Computation as
 > Monoids](https://arxiv.org/pdf/1406.4823.pdf)"). In addition, as for monads
-> and application functors, arrows have a dedicated syntax: [The Arrow
+> and applicatives functors, arrows have a dedicated syntax: [The Arrow
 > Notation](https://www.staff.city.ac.uk/~ross/papers/notation.pdf), explicitly
 > implementing the different classes related to the arrows thus allows to
 > benefit from a syntax "_probably more pleasant to read_". Hence the current

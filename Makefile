@@ -1,4 +1,4 @@
-.PHONY: blogger clean clean-site server reload server-full
+.PHONY: blogger clean clean-site deps
 
 blogger:
 	dune build
@@ -9,12 +9,7 @@ clean:
 clean-site:
 	rm -rf _site/
 
-server:
-	python3 -m http.server --directory _site/
-
-reload: clean clean-site
-	dune build
-	./src/blogger.exe
-
-server-full: reload
-	python3 -m http.server --directory _site/
+deps:
+	opam install . --deps-only --with-doc --with-test
+	opam install yocaml
+	opam install yocaml_unix yocaml_yaml yocaml_markdown yocaml_jingooy
