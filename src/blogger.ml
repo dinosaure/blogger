@@ -31,8 +31,9 @@ let man =
 let build_cmd =
   let open Cmdliner in
   let doc = Format.asprintf "Build the blog into [%s]" Task.target in
-  let exits = Term.default_exits in
-  Term.(const build $ const ()), Term.info "build" ~version ~doc ~exits ~man
+  let exits = Cmd.Exit.defaults in
+  let info = Cmd.info "build" ~version ~doc ~exits ~man in
+  Cmd.v info Term.(const build $ const ())
 ;;
 
 let watch_cmd =
@@ -42,26 +43,28 @@ let watch_cmd =
       "Serve [%s] as an HTTP server and rebuild website on demand"
       Task.target
   in
-  let exits = Term.default_exits in
+  let exits = Cmd.Exit.defaults in
   let port_arg =
     let doc = Format.asprintf "The port (default: %d)" default_port in
     let arg = Arg.info ~doc [ "port"; "P"; "p" ] in
     Arg.(value & opt (some int) None & arg)
   in
-  Term.(const watch $ port_arg), Term.info "watch" ~version ~doc ~exits ~man
+  let info = Cmd.info "watch" ~version ~doc ~exits ~man in
+  Cmd.v info Term.(const watch $ port_arg)
 ;;
 
 let index =
   let open Cmdliner in
+  let sdocs = Manpage.s_common_options in
   let doc = "Build or serve my personal website" in
-  let exits = Term.default_exits in
-  ( Term.(ret (const (`Help (`Pager, None))))
-  , Term.info caller ~version ~doc ~exits ~man )
+  let info = Cmd.info "darcs" ~version:"%%VERSION%%" ~doc ~sdocs ~man in
+  let default = Term.(ret (const (`Help (`Pager, None)))) in
+  Cmd.group info ~default [ build_cmd; watch_cmd ]
 ;;
 
 let () =
   let () = Logs.set_level ~all:true (Some Logs.Info) in
   let () = Logs.set_reporter (Logs_fmt.reporter ()) in
   let open Cmdliner in
-  Term.(exit (eval_choice index [ build_cmd; watch_cmd ]))
+  exit (Cmd.eval index)
 ;;

@@ -12,4 +12,7 @@ clean-site:
 deps:
 	opam install . --deps-only --with-doc --with-test
 	opam install yocaml
-	opam install yocaml_unix yocaml_yaml yocaml_markdown yocaml_jingooy
+	opam install yocaml_unix yocaml_yaml yocaml_markdown yocaml_jingoo
+
+fmt:
+	dune build @fmt --auto-promote
