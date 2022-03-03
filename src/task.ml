@@ -12,12 +12,12 @@ let template file = add_extension file "html" |> into "templates"
 let article_template = template "article"
 let layout_template = template "layout"
 let list_template = template "list_articles"
-let article_target file = Collection.article_path file |> into target
+let article_target file = Model.article_path file |> into target
 let binary_update = Build.watch Sys.argv.(0)
 let index_html = "index.html" |> into target
 let index_md = "index.md" |> into "pages"
 let rss_feed = "feed.xml" |> into target
-let tag_file tag = Collection.tag_path tag |> into target
+let tag_file tag = Model.tag_path tag |> into target
 let tag_template = template "tag"
 
 let move_css =
@@ -52,23 +52,18 @@ let process_articles =
         (article_target article_file)
         (binary_update
         >>> Metaformat.read_file_with_metadata
-              (module Metadata.Article)
+              (module Model.Article)
               article_file
         >>> Markup.content_to_html ()
-        >>> Template.apply_as_template
-              (module Metadata.Article)
-              article_template
-        >>> Template.apply_as_template
-              (module Metadata.Article)
-              layout_template
+        >>> Template.apply_as_template (module Model.Article) article_template
+        >>> Template.apply_as_template (module Model.Article) layout_template
         >>^ Stdlib.snd))
 ;;
 
 let merge_with_page ((meta, content), articles) =
-  let open Metadata in
-  let title = Page.title meta in
-  let description = Page.description meta in
-  Articles.make ?title ?description articles, content
+  let title = Metadata.Page.title meta in
+  let description = Metadata.Page.description meta in
+  Model.Articles.make ?title ?description articles, content
 ;;
 
 let generate_feed =
@@ -84,9 +79,7 @@ let generate_feed =
 let generate_tags =
   let* deps, tags = Collection.Tags.compute (module Metaformat) "articles" in
   let tags_string = List.map (fun (i, s) -> i, List.length s) tags in
-  let mk_meta tag articles () =
-    Collection.Tag.make tag articles tags_string, ""
-  in
+  let mk_meta tag articles () = Model.Tag.make tag articles tags_string, "" in
   List.fold_left
     (fun program (tag, articles) ->
       let open Build in
@@ -96,10 +89,8 @@ let generate_tags =
            (init deps
            >>> binary_update
            >>^ mk_meta tag articles
-           >>> Template.apply_as_template (module Collection.Tag) tag_template
-           >>> Template.apply_as_template
-                 (module Collection.Tag)
-                 layout_template
+           >>> Template.apply_as_template (module Model.Tag) tag_template
+           >>> Template.apply_as_template (module Model.Tag) layout_template
            >>^ Stdlib.snd))
     (return ())
     tags
@@ -117,7 +108,7 @@ let generate_index =
     >>> Markup.content_to_html ()
     >>> articles_arrow
     >>^ merge_with_page
-    >>> Template.apply_as_template (module Metadata.Articles) list_template
-    >>> Template.apply_as_template (module Metadata.Articles) layout_template
+    >>> Template.apply_as_template (module Model.Articles) list_template
+    >>> Template.apply_as_template (module Model.Articles) layout_template
     >>^ Stdlib.snd)
 ;;

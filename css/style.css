@@ -58,15 +58,68 @@ footer {
   padding-top: 32px;
 }
 
+.list-articles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .list-articles > li {
-  margin-bottom: 12px;
-}
-.list-articles > li > span.date {
-  color: #a3a1a8;
-}
-.list-articles > li > p {
   padding: 0;
   margin: 0;
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: row;
+}
+
+.list-articles > li > div.side {
+  flex: 0;
+}
+
+
+.list-articles > li > div.side img {
+  width: 32px;
+}
+
+.list-articles > li > div.content {
+  flex: 1;
+  margin-left: 12px;
+}
+
+.list-articles > li > div.content > span.date {
+  color: #a3a1a8;
+}
+.list-articles > li > div.content > p {
+  padding: 0;
+  margin: 0;
+}
+
+.list-articles > li > div.content > div.bottom {
+  padding: 4px 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.list-articles > li > div.content > div.bottom > a {
+  border: 0px solid black;
+  margin: 0 2px;
+}
+
+
+
+.list-articles > li > div.content > div.bottom > a:last-child {
+  margin-right: 0;
+}
+
+.list-articles > li > div.content > div.bottom > a > img {
+  width: 24px;
+}
+
+.list-articles > li > div.content > div.bottom > span {
+  font-weight: 900;
+  margin-right: 4px;
 }
 
 article h1 {

@@ -6,7 +6,7 @@ let feed_url = into domain "feed.xml"
 let articles_to_items articles =
   List.map
     (fun (article, url) ->
-      Metadata.Article.to_rss_item (into domain url) article)
+      Model.Article.to_rss_item (into domain url) article)
     articles
 ;;
 

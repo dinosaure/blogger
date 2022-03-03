@@ -6,10 +6,18 @@ article_description:
   communication channels. What better way to talk about silly things than
   with a stark blog? In this article, we'll show you how this blog works.
 tags:
-  - Ocaml
+  - OCaml
   - Effect
   - Preface
   - Blog
+co_authors:
+  - author: 
+      name: xvw
+      link: https://twitter.com/vdwxv
+      email: xaviervdw@gmail.com
+    contribution:
+      Friendly proofreading, help with some rewording and the creation 
+      of diagrams.
 ---
 
 > For several years (approximately 2), my friends
@@ -929,7 +937,7 @@ as much detail as possible! _Stay tuned_.
 > correspondence with strong profonctions was formalised (and very nicely
 > summarised in the excellent "[Notions of Computation as
 > Monoids](https://arxiv.org/pdf/1406.4823.pdf)"). In addition, as for monads
-> and applicatives functors, arrows have a dedicated syntax: [The Arrow
+> and applicative functors, arrows have a dedicated syntax: [The Arrow
 > Notation](https://www.staff.city.ac.uk/~ross/papers/notation.pdf), explicitly
 > implementing the different classes related to the arrows thus allows to
 > benefit from a syntax "_probably more pleasant to read_". Hence the current
