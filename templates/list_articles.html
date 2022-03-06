@@ -25,6 +25,13 @@
             <span class="date">{{ article.date.canonical }}</span>
             <a href="{{ article.url }}">{{ article.article_title }}</a><br />
             <p>{{ article.article_description }}</p>
+            <div class="bottom">
+                <ul class="tags-list">
+                    {%- for tag in article.tags -%}
+                    <li><a href="/tags/{{ tag  }}.html">{{ tag }}</a></li>
+                    {%- endfor -%}
+                </ul>
+            </div>
         </div>
     </li>
     {%- endfor -%}
