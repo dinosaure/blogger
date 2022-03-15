@@ -57,7 +57,7 @@ let index =
   let open Cmdliner in
   let sdocs = Manpage.s_common_options in
   let doc = "Build or serve my personal website" in
-  let info = Cmd.info "darcs" ~version:"%%VERSION%%" ~doc ~sdocs ~man in
+  let info = Cmd.info "blogger" ~version:"%%VERSION%%" ~doc ~sdocs ~man in
   let default = Term.(ret (const (`Help (`Pager, None)))) in
   Cmd.group info ~default [ build_cmd; watch_cmd ]
 ;;
