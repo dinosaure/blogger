@@ -184,13 +184,16 @@ let build_and_push _quiet target branch author author_email remote hook =
     Sync.push active_branch upstream
     >|= failwith_push_error
     >>= fun _ ->
-    Http_lwt_client.one_request
-      ~config:(`HTTP_1_1 Httpaf.Config.default)
-      ~meth:`GET
-      (Uri.to_string hook)
-    >>= function
-    | Ok (_response, _body) -> Lwt.return_unit
-    | Error (`Msg err) -> failwith err
+    match hook with
+    | None -> Lwt.return_unit
+    | Some hook ->
+      Http_lwt_client.one_request
+        ~config:(`HTTP_1_1 Httpaf.Config.default)
+        ~meth:`GET
+        (Uri.to_string hook)
+      >>= (function
+      | Ok (_response, _body) -> Lwt.return_unit
+      | Error (`Msg err) -> failwith err)
   in
   Lwt_main.run (fiber ())
 ;;
@@ -367,7 +370,7 @@ let push_cmd =
       | v -> Ok v
       | exception _ -> Rresult.R.error_msgf "Invalid URI: %s" str
     in
-    Arg.(required & opt (some (conv (of_string, Uri.pp))) None & arg)
+    Arg.(value & opt (some (conv (of_string, Uri.pp))) None & arg)
   in
   let info = Cmd.info "push" ~version ~doc ~exits ~man in
   Cmd.v
