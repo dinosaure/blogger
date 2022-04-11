@@ -1,4 +1,4 @@
-name: Deploy
+name: Build
 on:
   push:
     branches:
@@ -17,16 +17,6 @@ jobs:
           ocaml-compiler: 4.13.x
           opam-depext-flags: --with-test
 
+      - run: opam pin add -y .
       - run: opam install . --deps-only --with-doc --with-test
-      - run: opam install yocaml
-      - run: opam install yocaml_unix yocaml_yaml yocaml_markdown yocaml_jingoo
       - run: opam exec -- dune exec src/blogger.exe -- build
-
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
-          publish_dir: ./_site/
-          external_repository: xhtmlboi/xhtmlboi.github.io
-          publish_branch: main
-          enable_jekyll: false
