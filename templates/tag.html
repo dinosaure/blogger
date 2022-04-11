@@ -15,7 +15,7 @@
     </h3>
     <ul>
         {%- for article in articles -%}
-        <li><a href="/{{ article.url }}">{{ article.article_title  }}</a></li>
+        <li><a href="/{{ article.url }}">{{ article.metadata.title  }}</a></li>
         {%- endfor -%}
     </ul>
 </div>

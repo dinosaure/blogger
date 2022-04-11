@@ -1,12 +1,15 @@
 (executable
  (name blogger)
- (promote (until-clean))
  (libraries
   logs
   cmdliner
   preface
+  irmin-unix
+  mirage-clock-unix
+  http-lwt-client
   yocaml
   yocaml_yaml
   yocaml_markdown
   yocaml_unix
+  yocaml_irmin
   yocaml_jingoo))

@@ -37,7 +37,11 @@ module Author = struct
   ;;
 
   let default_user =
-    make "Xhtmlboy" "https://xhtmlboi.github.io" "xhtmlboi@gmail.com" None
+    make
+      "dinosaure"
+      "https://blog.osau.re/"
+      "romain.calascibetta@gmail.com"
+      None
   ;;
 
   let gravatar email =
@@ -154,8 +158,8 @@ module Article = struct
       >>= V.object_and (fun assoc ->
               let open Validate.Applicative in
               make
-              <$> V.(required_assoc string) "article_title" assoc
-              <*> V.(required_assoc string) "article_description" assoc
+              <$> V.(required_assoc string) "article.title" assoc
+              <*> V.(required_assoc string) "article.description" assoc
               <*> V.(optional_assoc_or ~default:[] (list_of string))
                     "tags"
                     assoc
@@ -170,7 +174,7 @@ module Article = struct
                     optional_assoc_or
                       ~default:[]
                       (list_of (Co_author.from (module V)))
-                      "co_authors"
+                      "coauthors"
                       assoc))
   ;;
 
@@ -197,14 +201,17 @@ module Article = struct
       | _ -> true
     in
     D.
-      [ "article_title", string article_title
-      ; "article_description", string article_description
+      [ ( "metadata"
+        , object_
+            [ "title", string article_title
+            ; "description", string article_description
+            ] )
       ; "tags", list (List.map string tags)
       ; "date", object_ $ Metadata.Date.inject (module D) date
       ; "author", object_ $ Author.inject (module D) author
-      ; "co_authors", list co_authors
-      ; "invited_article", boolean invited_article
-      ; "has_co_authors", boolean has_co_authors
+      ; "coauthors", list co_authors
+      ; "invited", boolean invited_article
+      ; "has_coauthors", boolean has_co_authors
       ]
     @ Metadata.Page.inject (module D) (Metadata.Page.make title description)
   ;;

@@ -1,1 +1,97 @@
-pre code.hljs{display:block;overflow-x:auto;padding:1em}code.hljs{padding:3px 5px}.hljs{color:#333;background:#fff}.hljs-comment,.hljs-quote{color:#777;font-style:italic}.hljs-keyword,.hljs-selector-tag,.hljs-subst{color:#333;font-weight:700}.hljs-literal,.hljs-number{color:#777}.hljs-doctag,.hljs-formula,.hljs-string{color:#333;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAJ0lEQVQIW2O8e/fufwYGBgZBQUEQxcCIIfDu3Tuwivfv30NUoAsAALHpFMMLqZlPAAAAAElFTkSuQmCC)}.hljs-section,.hljs-selector-id,.hljs-title{color:#000;font-weight:700}.hljs-subst{font-weight:400}.hljs-class .hljs-title,.hljs-name,.hljs-title.class_,.hljs-type{color:#333;font-weight:700}.hljs-tag{color:#333}.hljs-regexp{color:#333;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAICAYAAADA+m62AAAAPUlEQVQYV2NkQAN37979r6yszIgujiIAU4RNMVwhuiQ6H6wQl3XI4oy4FMHcCJPHcDS6J2A2EqUQpJhohQDexSef15DBCwAAAABJRU5ErkJggg==)}.hljs-bullet,.hljs-link,.hljs-symbol{color:#000;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAKElEQVQIW2NkQAO7d+/+z4gsBhJwdXVlhAvCBECKwIIwAbhKZBUwBQA6hBpm5efZsgAAAABJRU5ErkJggg==)}.hljs-built_in{color:#000;text-decoration:underline}.hljs-meta{color:#999;font-weight:700}.hljs-deletion{color:#fff;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAADCAYAAABS3WWCAAAAE0lEQVQIW2MMDQ39zzhz5kwIAQAyxweWgUHd1AAAAABJRU5ErkJggg==)}.hljs-addition{color:#000;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAkAAAAJCAYAAADgkQYQAAAALUlEQVQYV2N89+7dfwYk8P79ewZBQUFkIQZGOiu6e/cuiptQHAPl0NtNxAQBAM97Oejj3Dg7AAAAAElFTkSuQmCC)}.hljs-emphasis{font-style:italic}.hljs-strong{font-weight:700}
+/*!
+    Theme: devibeans (dark)
+    Author: @terminaldweller
+    Maintainer: @terminaldweller
+
+    Inspired by vim's jellybeans theme (https://github.com/nanotech/jellybeans.vim)
+*/
+
+.hljs {
+  background: #000000;
+  color: #a39e9b;
+}
+
+.hljs-attr,
+.hljs-template-tag {
+  color: #8787d7;
+}
+
+.hljs-comment,
+.hljs-doctag,
+.hljs-quote {
+  color: #339966;
+}
+
+.hljs-params {
+  color: #a39e9b;
+}
+
+.hljs-regexp {
+  color: #d700ff;
+}
+
+.hljs-tag,
+.hljs-selector-id,
+.hljs-number,
+.hljs-literal {
+  color: #ef5350;
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+
+  color: #0087ff;
+}
+
+/* opt-out */
+.hljs-operator,
+.hljs-punctuation{
+}
+
+.hljs-selector-class,
+.hljs-code,
+.hljs-formula,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-link,
+.hljs-keyword {
+  color: #64b5f6;
+}
+
+.hljs-built_in,
+.hljs-title,
+.hljs-deletion {
+  color: #ff8700;
+}
+
+.hljs-type,
+.hljs-section,
+.hljs-function,
+.hljs-name,
+.hljs-property,
+.hljs-attribute {
+  color: #ffd75f;
+}
+
+.hljs-meta .hljs-string,
+.hljs-string,
+.hljs-subst,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  color: #558b2f;
+}
+
+.hljs-selector-tag {
+  color: #9966ff;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}

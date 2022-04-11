@@ -1,6 +1,6 @@
-{%- if article_title -%}
+{%- if metadata.title -%}
 {%- set dash = " - " -%}
-{%- set page_title = article_title -%}
+{%- set page_title = metadata.title -%}
 {%- elseif title -%}
 {%- set dash = " - " -%}
 {%- set page_title = title -%}
@@ -8,12 +8,12 @@
 {%- set dash = "" -%}
 {%- set page_title = "" -%}
 {%- endif %}
-{% if article_description -%}
-{%- set page_description = article_description -%}
+{% if metadata.description -%}
+{%- set page_description = metadata.description -%}
 {%- elseif description -%}
 {%- set page_description = description -%}
 {%- else -%}
-{%- set page_description = "XHTMLBoy's website" -%}
+{%- set page_description = "blog.osau.re" -%}
 {%- endif -%}
 <!doctype html>
 <html lang="en">
@@ -21,23 +21,23 @@
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     <title>
-        XHTMLBoy's website{{ dash }}{{ page_title }}
+        Dinosaure's website{{ dash }}{{ page_title }}
     </title>
     <meta name="description" content="{{ page_description }}">
-    <link href="/css/fonts.css" rel="stylesheet">
     <link rel="stylesheet" href="/css/hl.css">
     <link href="/css/style.css" rel="stylesheet">
     <script src="/js/hl.js"></script>
-    <link rel="alternate" type="application/rss+xml" href="/feed.xml" title="RSSBoy">
+    <link rel="alternate" type="application/rss+xml" href="/feed.xml" title="RSS">
   </head>
   <body>
     <header>
-      <h1>XHTMLBoy's Website</h1>
+      <h1>blog.osau.re</h1>
       <blockquote>
-        You are on a website dedicated to the enthusiasts of
-        (valid) <strong>XHTML</strong>, and of <strong>beautiful
-        mechanics</strong>.
+	<strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
       </blockquote>
     </header>
     <main>
@@ -47,10 +47,7 @@
     </main>
     <footer>
         <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
-        (snif, WordPress was definitively a better name)
         <br />
-        <a class="valid" href="https://validator.w3.org/check?uri=https%3A%2F%2Fxhtmlboi.github.io&charset=%28detect+automatically%29&doctype=Inline&group=0">HTML5</a>
-        <a class="valid" href="https://jigsaw.w3.org/css-validator/validator?uri=https%3A%2F%2Fxhtmlboi.github.io%2Fcss%2Fstyle.css&profile=css3svg&usermedium=all&warning=1&vextwarning=&lang=en">CSS3</a>
     </footer>
     <script>hljs.highlightAll();</script>
   </body>

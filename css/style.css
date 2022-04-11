@@ -13,7 +13,7 @@ body {
   max-width: 840px;
   background-color: #fff;
   color: #444444;
-  font-family: "Roboto";
+  font-family: "monospace";
 }
 
 h1,
@@ -129,14 +129,14 @@ article blockquote h4 {
 }
 
 article pre {
-  background-color: #ffffff;
   margin: 16px 8px;
   padding: 8px;
-  font-family: "Roboto Mono";
+  font-family: Courier;
   font-size: 1.2em;
   line-height: 0.8;
   width: 100%;
   overflow-x: auto;
+  background-color: #000;
 }
 
 article img {
@@ -148,7 +148,6 @@ article img {
 .hljs,
 article code {
   font-family: "Roboto Mono";
-  background-color: #ffffff;
   line-height: 1.2em;
 }
 

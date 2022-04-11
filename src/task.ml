@@ -3,53 +3,47 @@ module Metaformat = Yocaml_yaml
 module Markup = Yocaml_markdown
 module Template = Yocaml_jingoo
 
-let target = "_site/"
-let css_target = "css" |> into target
-let javascript_target = "js" |> into target
-let fonts_target = "fonts" |> into target
-let images_target = "images" |> into target
+let css_target target = "css" |> into target
+let javascript_target target = "js" |> into target
+let images_target target = "images" |> into target
 let template file = add_extension file "html" |> into "templates"
 let article_template = template "article"
 let layout_template = template "layout"
 let list_template = template "list_articles"
-let article_target file = Model.article_path file |> into target
+let article_target file target = Model.article_path file |> into target
 let binary_update = Build.watch Sys.argv.(0)
-let index_html = "index.html" |> into target
+let index_html target = "index.html" |> into target
 let index_md = "index.md" |> into "pages"
-let rss_feed = "feed.xml" |> into target
-let tag_file tag = Model.tag_path tag |> into target
+let rss_feed target = "feed.xml" |> into target
+let tag_file tag target = Model.tag_path tag |> into target
 let tag_template = template "tag"
 
-let move_css =
-  process_files [ "css" ] File.is_css (Build.copy_file ~into:css_target)
-;;
-
-let move_fonts =
+let move_css target =
   process_files
-    [ "fonts" ]
-    (Fun.const true)
-    (Build.copy_file ~into:fonts_target)
+    [ "css" ]
+    File.is_css
+    (Build.copy_file ~into:(css_target target))
 ;;
 
-let move_javascript =
+let move_javascript target =
   process_files
     [ "js" ]
     File.is_javascript
-    (Build.copy_file ~into:javascript_target)
+    (Build.copy_file ~into:(javascript_target target))
 ;;
 
-let move_images =
+let move_images target =
   process_files
     [ "images" ]
     File.is_image
-    (Build.copy_file ~into:images_target)
+    (Build.copy_file ~into:(images_target target))
 ;;
 
-let process_articles =
+let process_articles target =
   process_files [ "articles" ] File.is_markdown (fun article_file ->
       let open Build in
       create_file
-        (article_target article_file)
+        (article_target article_file target)
         (binary_update
         >>> Metaformat.read_file_with_metadata
               (module Model.Article)
@@ -66,17 +60,17 @@ let merge_with_page ((meta, content), articles) =
   Model.Articles.make ?title ?description articles, content
 ;;
 
-let generate_feed =
+let generate_feed target =
   let open Build in
   let* articles_arrow =
     Collection.Articles.get_all (module Metaformat) "articles"
   in
   create_file
-    rss_feed
+    (rss_feed target)
     (binary_update >>> articles_arrow >>^ Feed.make >>^ Rss.Channel.to_rss)
 ;;
 
-let generate_tags =
+let generate_tags target =
   let* deps, tags = Collection.Tags.compute (module Metaformat) "articles" in
   let tags_string = List.map (fun (i, s) -> i, List.length s) tags in
   let mk_meta tag articles () = Model.Tag.make tag articles tags_string, "" in
@@ -85,7 +79,7 @@ let generate_tags =
       let open Build in
       program
       >> create_file
-           (tag_file tag)
+           (tag_file tag target)
            (init deps
            >>> binary_update
            >>^ mk_meta tag articles
@@ -96,13 +90,13 @@ let generate_tags =
     tags
 ;;
 
-let generate_index =
+let generate_index target =
   let open Build in
   let* articles_arrow =
     Collection.Articles.get_all (module Metaformat) "articles"
   in
   create_file
-    index_html
+    (index_html target)
     (binary_update
     >>> Metaformat.read_file_with_metadata (module Metadata.Page) index_md
     >>> Markup.content_to_html ()
