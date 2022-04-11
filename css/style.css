@@ -13,7 +13,7 @@ body {
   max-width: 840px;
   background-color: #fff;
   color: #444444;
-  font-family: "monospace";
+  font-family: monospace;
 }
 
 h1,
