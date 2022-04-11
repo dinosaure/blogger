@@ -145,12 +145,6 @@ article img {
   max-width: 100%;
 }
 
-.hljs,
-article code {
-  font-family: "Roboto Mono";
-  line-height: 1.2em;
-}
-
 .hljs-built_in {
   text-decoration: none;
 }
