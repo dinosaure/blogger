@@ -45,7 +45,7 @@ a /filter/, an organizer, etc.
 The main problem about email is the *folding-whitespace*. It permits the user
 to extend a value of a field to multiple lines such as:
 
-```rfc822
+```text
 To: A Group(Some people)
    :Chris Jones <c@(Chris's host.)public.example>,
      joe@example.org,
