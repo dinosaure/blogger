@@ -201,7 +201,8 @@ module Article = struct
       | _ -> true
     in
     D.
-      [ ( "metadata"
+      [ "root", string ".."
+      ; ( "metadata"
         , object_
             [ "title", string article_title
             ; "description", string article_description
@@ -260,6 +261,7 @@ module Articles = struct
              D.object_
                (("url", D.string url) :: Article.inject (module D) article))
            articles) )
+    :: ("root", D.string ".")
     :: (Metadata.Page.inject (module D) $ Metadata.Page.make title description)
   ;;
 end
@@ -291,6 +293,7 @@ module Tag = struct
       { tag; tags; articles; title; description }
     =
     ("tag", D.string tag)
+    :: ("root", D.string "..")
     :: ("articles", D.list (List.map (article_object (module D)) articles))
     :: ( "tags"
        , D.list
