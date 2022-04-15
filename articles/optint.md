@@ -163,7 +163,7 @@ module Conditional = struct
     | False : ('t, _, 't) t
 end
 
-let is_immediate : (Optint.t, int, int32) = match repr with
+let is_immediate : (Optint.t, int, int32) Conditional.t = match repr with
   | Immediate -> Conditional.True
   | Non_immediate -> Conditional.False
 ```
