@@ -397,11 +397,11 @@ only from interactions and uses.
 
 ## Conclusion
 
-The website is available here: paste.osau.re. What this article shows is the
-involvement of people from the MirageOS community and elsewhere who have added
-their vision directly or indirectly to the project. The development in *onion
-layer* of what will allow to produce Pasteur shows the reusability of the
-knowledge of each one near other software.
+The website is available here: [paste.osau.re][paste]. What this article shows
+is the involvement of people from the MirageOS community and elsewhere who have
+added their vision directly or indirectly to the project. The development in
+*onion layer* of what will allow to produce Pasteur shows the reusability of
+the knowledge of each one near other software.
 
 It's sharing :) ! MirageOS does not wish to offer a monolithic solution to
 several problems but a scattered and immense ecosystem which can satisfy
@@ -424,3 +424,4 @@ everything in OCaml with unikernels :p !
 [craigfe]: https://github.com/CraigFe
 [hannes]: https://github.com/hannesm
 [TheLortex]: https://github.com/TheLortex
+[paste]: https://paste.osau.re/
