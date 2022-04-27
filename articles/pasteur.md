@@ -131,7 +131,7 @@ goal is that the server should not store the paste in clear text and that the
 only person in possession of the encryption key is the author of the paste.
 
 The trick is to encrypt the content directly in the webbrowser and to transmit
-only the encrypted content to the server (with POST and `multipart\_form`).
+only the encrypted content to the server (with POST and `multipart_form`).
 Then, in JavaScript, we can ask (still on the client side) to redirect the
 client to the result of its paste with its key.
 
@@ -373,10 +373,6 @@ handle reads and writes. The latter is also available in a *functor* in the
 the given TCP/IP stack and an HTTPS server from the same stack and `ocaml-tls`.
 In this ceremony, there is of course the support of `h2` which is finally very
 close in terms of API than `http/af`.
-
-The code of Paf is both very succinct and abstract which may be difficult to
-understand for a novice runner but the [README.md][readme-paf] or the tests
-give a good overview of its use in the context of MirageOS but also outside!
 
 ### Multiple iterations
 
