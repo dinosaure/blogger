@@ -161,6 +161,11 @@ article pre code {
   font-size: 0.8em;
 }
 
+article code {
+  font-family: Courier;
+  font-size: 0.8em;
+}
+
 .tag-box {
   margin: 0;
   margin-bottom: 32px;
