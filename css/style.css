@@ -49,6 +49,18 @@ header blockquote {
   margin: 0;
 }
 
+hr {
+  width: 0%;
+  min-width: 20%;
+  max-width: 100%;
+  margin: 0 auto;
+  border: none;
+  border-bottom: 1px solid #666;
+  position: relative;
+  transition: box-shadow 200ms ease-in-out;
+  box-shadow: 0px 0px 0px 0px #f9f9f9;
+}
+
 main {
   margin: 42px 0px;
   line-height: 1.6;
