@@ -145,7 +145,7 @@ article pre {
   padding: 8px;
   font-family: Courier;
   font-size: 1.2em;
-  line-height: 0.8;
+  line-height: 100%;
   width: 100%;
   overflow-x: auto;
   background-color: #000;
