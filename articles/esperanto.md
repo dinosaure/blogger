@@ -683,7 +683,7 @@ unconventional but it leads to a very interesting result.
 Cosmopolitan is a beautiful, complex but very interesting project. A bit
 magical, but:
 > Any sufficiently advanced technology is indistinguishable from magic
-> Arthur C. Clarke
+> — Arthur C. Clarke
 
 I really hope to have the time to continue this project and to go a bit further
 into the multitudes of tools that I could make in OCaml and that helped me in
