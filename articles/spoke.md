@@ -10,11 +10,11 @@ tags:
   - MirageOS
 ---
 
-I recently discovered [PAKE for Password-Authenticated Key Agreement](https://en.wikipedia.org/wiki/Password-authenticated_key_agreement). It is a
-method of initiating a secure connection based on a password known between the
-two people. The key thing to remember here is that the password will never be
-disclosed to an attacker through the protocol. A known
-algorithm is used to derive a strong shared key from this password.
+I recently discovered [PAKE for Password-Authenticated Key Agreement][pake]. It
+is a method of initiating a secure connection based on a password known between
+the two people. The key thing to remember here is that the password will never
+be disclosed to an attacker through the protocol. A known algorithm is used to
+derive a strong shared key from this password.
 
 Of course, to perform this derivation, we still need to share some information.
 This is where a feature of the protocol must be ensured: transmitted
@@ -65,7 +65,8 @@ In this respect, this protocol seems to be very interesting to initiate a
 secure connection from a weak password. We will see here how:
 1) implement what are called cryptographic primitives 
 2) implement the handshake
-3) end up with a protocol implementation like `Mirage_flow.S` for ease of use
+3) how we end up with a protocol implementation like `Mirage_flow.S` for ease
+   of use
 
 ## Primitives
 
@@ -78,8 +79,8 @@ From the experience we have with [mirage-crypto][mirage-crypto] but also
 non-option as far as performance is concerned because it is essentially about
 manipulating uniform arrays containing `uint32` or `uint64`. Even if OCaml
 (flambda?) can optimise this kind of code, C (unfortunately) remains the best
-option as far as expressiveness and performance is concerned - indeed, we wouldn't
-want the GC to intervene in the middle of a computation...
+option as far as expressiveness and performance is concerned - indeed, we
+wouldn't want the GC to intervene in the middle of a computation...
 
 However, C is still very bad at one thing: allocation and, as far as OCaml is
 concerned, interaction between C and the OCaml GC - this is where errors are
@@ -97,6 +98,8 @@ let xor str0 str1 =
   let buf = Bytes.of_string (String.sub str1 0 len) (* allocation *) in
   xor_into str0 ~src_off:0 buf ~dst_off:0 ~len ;
   Bytes.unsafe_to_string buf
+  (* [buf] has been allocated locally and never been shared, thus it is safe to
+     treat it as string before returning. *)
 ```
 
 ```c
@@ -203,6 +206,8 @@ let alice _X =
   let _Y = ed25519_add gy (ed25519_from_uniform n) in
   let gx = ed25519_sub _X (ed25519_from_uniform m) in
   let _Z = scalar () and _V = scalar () in
+  (* [scalar] allocates a zero-ed buffer which can be use
+     by [ed25519_scalarmult_into] then. *)
   if ed25519_scalarmult_into _Z y gx = true
   && ed25519_scalarmult_into _V y _L = true
   then send _Y
@@ -215,7 +220,7 @@ aborts if `Y` is not in the large prime-order subgroup of `G`:
 let bob _Y =
   let gy = ed25519_sub _Y (ed25519_from_uniform n)
   if ed25519_scalarmult_into _Z x gy = false
-  && ed25519_scalarmult_into _V l gy = false
+  || ed25519_scalarmult_into _V l gy = false
   then abort
 ```
 
@@ -228,7 +233,6 @@ known only to Bob and Alice), `Z`, `V` (which have been calculated):
                                         |
                                         | salt <- random()
                                         | m, n, k, l = KDF(password, salt)
-                                        | L = l * P
                                         |
                                <= transmit salt <=
                                         |
@@ -239,6 +243,7 @@ known only to Bob and Alice), `Z`, `V` (which have been calculated):
                                         |
                                 => transmit X =>
                                         |
+                                        | L = l * P
                                         | y <- random()
                                         | g^y = y * P
                                         | Y = g^y + h * E(n)
@@ -258,9 +263,8 @@ known only to Bob and Alice), `Z`, `V` (which have been calculated):
 ### Serialization / de-serialization and isomorphism
 
 Throughout the process, information such as `m`, `n`, `l` and `k` must be kept.
-This information may be transferred over a network or we may simply want to
-store them in a database. Such use cases require the ability to serialise and
-deserialise this information.
+This information may be stored into a database. Such use cases require the
+ability to serialise and deserialise this information.
 
 More specifically, as we have said, the first packet can (and should) contain
 much more than just the `salt`, it should also contain information such as the
@@ -633,9 +637,9 @@ val send : state -> string -> unit t
 This is probably the most crucial moment in the implementation of a protocol.
 Indeed, if we're talking strictly about performance, we need to be able to
 issue the `Read` or `Write` only at times when we really need it - because, as
-far as our `'a t` type is concerned, it's when we receive these actions that our
-real _syscalls_ (`Unix.read` and `Unix.write` for example) take place, and it's
-then that we can't optimise - the kernel comes into play.
+far as our `'a t` type is concerned, it's when we receive these actions that
+our real _syscalls_ (`Unix.read` and `Unix.write` for example) take place, and
+it's then that we can't optimise - the kernel comes into play.
 
 As far as we are concerned, we can take the advantage of 2 points:
 - our packets are relatively small, we don't need to have a big intermediate
@@ -890,9 +894,14 @@ with a weak password.
 First, we need to implement a `run` function that uses the _syscalls_ in our
 `Flow` module to execute our _handshake_. The function is very similar to what
 we could do with the `Unix` module, except that we have to use the
-[Lwt monad](https://github.com/ocsigent/lwt). We will notice that it is quite simple to change the 
+[Lwt monad][lwt]. We will notice that it is quite simple to change the 
 underlying implementation that will take care of the network.
 ```ocaml
+let ( >>? ) = Lwt_result.bind
+let reword_error f = function
+  | Ok v -> Ok v
+  | Error err -> Error (f err)
+
 let run queue flow fiber =
   let cs_wr = Cstruct.create 128 in
   let allocator len = Cstruct.sub cs_wr 0 len in
@@ -933,10 +942,10 @@ val encrypt : cipher_state -> sequence:int64 -> Cstruct.t -> Cstruct.t
 val decrypt : cipher_state -> sequence:int64 -> Cstruct.t -> Cstruct.t option
 ```
 
-The `sequence` number allows a block to be tagged with a number that should only
-increment. In this way, we can check the order of our blocks (and be sure that
-we haven't forgotten one). This number is also shared between the client and
-the server to ensure that an attacker does not insert data arbitrarily (at
+The `sequence` number allows a block to be tagged with a number that should
+only increment. In this way, we can check the order of our blocks (and be sure
+that we haven't forgotten one). This number is also shared between the client
+and the server to ensure that an attacker does not insert data arbitrarily (at
 least, that would be more difficult).
 
 Finally, the `cipher_state` contains the extra elements that will also be
@@ -1221,3 +1230,5 @@ And if you find this work interesting, you can make a donation to
 [ke]: https://github.com/mirage/ke
 [robur.coop-donate]: https://robur.coop/Donate
 [spoke]: https://github.com/dinosaure/spoke
+[pake]: https://en.wikipedia.org/wiki/Password-authenticated_key_agreement
+[lwt]: https://github.com/ocsigent/lwt
