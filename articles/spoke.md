@@ -10,10 +10,10 @@ tags:
   - MirageOS
 ---
 
-I recently discovered PAKE for Password-Authenticated Key Agreement. It is a
+I recently discovered [PAKE for Password-Authenticated Key Agreement](https://en.wikipedia.org/wiki/Password-authenticated_key_agreement). It is a
 method of initiating a secure connection based on a password known between the
-2 people. The key thing to remember here is that the password will never be
-disclosed to an attacker through the protocol. On the other hand, a known
+two people. The key thing to remember here is that the password will never be
+disclosed to an attacker through the protocol. A known
 algorithm is used to derive a strong shared key from this password.
 
 Of course, to perform this derivation, we still need to share some information.
@@ -21,13 +21,13 @@ This is where a feature of the protocol must be ensured: transmitted
 information between Alice & Bob must "look" like random content.
 
 Indeed, an attacker can recognise the content (this chunk looks suspiciously
-like something used by a well-known  protocol), he/she can also recognise the
-algorithm behind - and he/she can attempt a brute-force attack of some weak
+like something used by a well-known  protocol), they can also recognise the
+algorithm behind - and they can attempt a brute-force attack of some weak
 passwords to regenerate the exchanged chunks.
 
 The exchange must therefore seem random, but it is determined - so that both
 parties can finally agree on a strong shared key. Then, from the latter, a
-protocol can be established with a symmetric cryptographic method such as
+protocol can be established using a symmetric cryptographic method such as
 [GCM][gcm] or [ChaCha20 Poly1305][chacha20-poly1305].
 
 <hr />
@@ -55,7 +55,7 @@ into details about the security of SPAKE2+ and SPAKE2+EE. However, my research
 started with [this resource][SPAKE2+EE] which, in my opinion, explains well the
 difference between these two protocols.
 
-For more information about [Elligator 2][elligator] (the EE of SPAKE2+EE for
+For more information about [Elligator 2][elligator] (the EE of SPAKE2+EE, the
 Elligator Edition), the idea is to allow group elements to be serialized in a
 way that is indistinguishable from uniformly random strings of the same size.
 This ensures that it is difficult to recognise, from the point of view of an
@@ -78,7 +78,7 @@ From the experience we have with [mirage-crypto][mirage-crypto] but also
 non-option as far as performance is concerned because it is essentially about
 manipulating uniform arrays containing `uint32` or `uint64`. Even if OCaml
 (flambda?) can optimise this kind of code, C (unfortunately) remains the best
-option as far as expressiveness/performance is concerned - indeed, we wouldn't
+option as far as expressiveness and performance is concerned - indeed, we wouldn't
 want the GC to intervene in the middle of a computation...
 
 However, C is still very bad at one thing: allocation and, as far as OCaml is
@@ -257,7 +257,7 @@ known only to Bob and Alice), `Z`, `V` (which have been calculated):
 
 ### Serialization / de-serialization and isomorphism
 
-Throughout the process, information such as `m`, `n`, `l` or `k` must be kept. 
+Throughout the process, information such as `m`, `n`, `l` and `k` must be kept.
 This information may be transferred over a network or we may simply want to
 store them in a database. Such use cases require the ability to serialise and
 deserialise this information.
@@ -294,7 +294,7 @@ val public_of_string : string -> (public, [> `Msg of string ]) result
 
 Serialization is the very "error-prone" moment (little-endian, big-endian, how
 to handle error cases, `x = decode(encode(x))`?) and it is often a matter of
-using a tool to help us implement the `of_string`/`to_string` couple without
+using a tool to help us implement the `of_string`/`to_string` pair without
 pain.
 
 For this, and especially when we are looking for isomorphism as a property,
@@ -412,7 +412,7 @@ let generate : type a.
 
 Let's put aside the question of transmission over the network for a moment and
 concentrate again on what is our _handshake_. Alice is able to create a
-"public" packet. It is then a matter of letting Bob deserialise it so that it
+"public" packet. It is then a matter of letting Bob deserialise it so that he
 generates `E(m)`, `E(n)`, `k` and `L = l * P` on its own way. According to what
 we have just described, Bob will also have to generate a random `X` value and
 send it to Alice.
@@ -890,7 +890,7 @@ with a weak password.
 First, we need to implement a `run` function that uses the _syscalls_ in our
 `Flow` module to execute our _handshake_. The function is very similar to what
 we could do with the `Unix` module, except that we have to use the
-[Lwt monad][lwt]. We will notice that it is quite simple to change the
+[Lwt monad](https://github.com/ocsigent/lwt). We will notice that it is quite simple to change the 
 underlying implementation that will take care of the network.
 ```ocaml
 let run queue flow fiber =
@@ -1160,7 +1160,7 @@ at this moment that there can be leaks which can help the attacker.
 
 In the end, the abstraction remains very close to what [ocaml-tls][ocaml-tls]
 and especially `tls.mirage` offers, making it easy to compose protocols
-(with [mimic][mimic]).
+(with [mimic](https://github.com/dinosaure/mimic)).
 
 Like `mirage-tcpip`, `Unix` or `Tls_mirage.Make`, we can now imagine a higher
 level protocol because we have just implemented a security layer rather than an
@@ -1198,7 +1198,7 @@ refer to them as the other 10%) will, like me, want to go into details even if
 it means looking at the code.
 
 And if you find this work interesting, you can make a donation to
-[robur.io][robur.io-donate]. You can find the project [here][spoke].
+[robur.coop][robur.coop-donate]. You can find the project [here][spoke].
 
 [elligator]: https://elligator.cr.yp.to/
 [SPAKE2+]: https://tools.ietf.org/id/draft-bar-cfrg-spake2plus-00.html
@@ -1219,5 +1219,5 @@ And if you find this work interesting, you can make a donation to
 [mirage-tcpip]: https://github.com/mirage/mirage-tcpip
 [ringbuffer-xen]: https://perdu.com
 [ke]: https://github.com/mirage/ke
-[robur.io-donate]: https://perdu.com
+[robur.coop-donate]: https://robur.coop/Donate
 [spoke]: https://github.com/dinosaure/spoke
