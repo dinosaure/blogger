@@ -1220,13 +1220,13 @@ And if you find this work interesting, you can make a donation to
 [ocaml-tls]: https://github.com/mirleft/ocaml-tls
 [colombe]: https://github.com/mirage/colombe
 [decompress]: https://github.com/mirage/decompress
-[gcm]: https://perdu.com
-[chacha20-poly1305]: https://perdu.com
+[gcm]: https://en.wikipedia.org/wiki/Galois/Counter_Mode
+[chacha20-poly1305]: https://www.rfc-editor.org/rfc/rfc7539.html
 [encore]: https://github.com/mirage/encore
 [angstrom]: https://github.com/inhabitedtype/angstrom
-[mirage-flow]: https://perdu.com
+[mirage-flow]: https://github.com/mirage/mirage-flow
 [mirage-tcpip]: https://github.com/mirage/mirage-tcpip
-[ringbuffer-xen]: https://perdu.com
+[ringbuffer-xen]: http://xenbits.xen.org/docs/4.6-testing/misc/xenstore-ring.txt
 [ke]: https://github.com/mirage/ke
 [robur.coop-donate]: https://robur.coop/Donate
 [spoke]: https://github.com/dinosaure/spoke
