@@ -118,7 +118,7 @@ static inline void xor_into (const uint8_t *src, uint8_t *dst, size_t n) {
 }
 
 #define Bytes_off(buf, off) ((uint8_t*) Bytes_val (buf) + Long_val (off))
-#define String_off(str, off) ((uint8_t*) Bytes_val (str) + Long_val (off))
+#define String_off(str, off) ((uint8_t*) String_val (str) + Long_val (off))
 
 CAMLprim value
 caml_xor_into (value src, value src_off, value dst, value dst_off, value len) {
