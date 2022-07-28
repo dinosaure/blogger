@@ -260,7 +260,7 @@ and role of each - and it is at this point that it should be impossible for us
 to retransmit (and thus reconstruct) a packet from one sender to another sender
 as the relay.
 
-## The Bob protocol
+## The Bob Protocol
 
 We'll just give a quick reminder of the protocol that has been extended. An
 introduction of the peers to the relay is required so that the peers define
@@ -305,10 +305,10 @@ relay. This is how receivers and senders can communicate directly via the
 relay.
 
 This last type of transmission (which, after all, concerns almost all our
-handshake) should only be the responsability of the peers. That is, when
+handshake) should only be the responsibility of the peers. That is, when
 transmitting a packet from one peer to another, the relay should not
 introspect/modify said packet and just retransmit it as long as our previous
-rules (a sender can only talk to a receiver and vice-versa) are respected.
+rules, i.e a sender can only talk to a receiver and vice-versa, are respected.
 
 ## The GADT
 
@@ -349,7 +349,8 @@ which we can deduce the role of the receiver and the same applies to the role
 of the sender. The relay, on the other hand, has both knowledge of the sender
 and the receiver of the packet. We are therefore going to encode, still with
 GADTs, a means of recognising the role of the source or the recipient of a
-packet:
+packet - if the role is a receiver/sender, we will associate its unique ID as
+an `int`:
 ```ocaml
 type ('from, 'to) src =
   | Relay : (relay, 'to) src
@@ -423,10 +424,17 @@ is valid - but let's not forget that, necessarily, a step exists before to
 remove the absurd cases! In this, we can really concentrate on the
 implementation of our state machine and so we will start with the sender:
 ```ocaml
-let send_to dst packet queue = Queue.push (Send_to (dst, packet)) queue
-let to_sender ~uid = Peer (Sender, uid)
-let to_recver ~uid = Peer (Recver, uid)
-let to_relay = Relay
+let send_to
+  : type from to. (from, to) dst -> (from, to) packet -> from send Queue.t -> unit
+  = fun dst packet queue -> Queue.push (Send_to (dst, packet)) queue
+
+let to_sender
+  : uid:int -> (recver, sender) dst
+  = fun ~uid -> Peer (Sender, uid)
+let to_recver
+  : uid:int -> (sender, recver) dst
+  = fun ~uid -> Peer (Recver, uid)
+let to_relay : (_, relay) dst = Relay
 
 type state =
   { secret           : Spoke.secret
@@ -491,7 +499,7 @@ we can only build (and then send) packets that only the sender can send - a
 
 Of course, the same can be done for the receiver by specialising the types with
 our other role. We could even just compile our code and follow the compiler's
-complaints to help us handle the morally valid cases one by one:
+complaints to help us handle the valid cases one by one:
 ```ocaml
 type state =
   { password : string
@@ -557,7 +565,7 @@ let next_packet state = Queue.take_opt state.queue
 ```
 
 Et voilà! As you can see, once again, you just have to follow the rules we have
-described - in other words, trust on your compiler and follow it!
+described - in other words, trust your compiler and follow its advice!
 
 ### An impure world
 
@@ -621,8 +629,7 @@ won't explain that here.
 
 However, there is still the implementation of the relay. The latter actually
 has 4 goals:
-- it is the authority that issues identities to our peers and assigns a unique
-  ID
+- it is the authority that issues and assigns unique identities to our peers
 - it is the one that informs the receivers of the arrival of new senders (see
   `New_server` packet)
 - it forwards packets from peer to peer according to the unique IDs written in
@@ -650,7 +657,7 @@ type ('from, 'non_from, 'to) transmit =
 
 Here, 3 cases are described:
 - the case of retransmitting a packet from one peer to another. Note that, of
-  couse, you want to retransmit to the dual/opposite of `'from`
+  course, you want to retransmit to the dual/opposite of `'from`
 - the case where the receiver wants to send a packet to the relay. The
   dual/opposite of the receiver must be specified even if the destination of
   the packet is the relay
@@ -658,7 +665,7 @@ Here, 3 cases are described:
 
 Finally, we need to separate the case where we want to send a packet to a peer
 in the role of the relay (as for `{Sender,Recver}_identity` packets) or in the
-role of the source of the packet when it comes to retransmission:
+role of the source of the packet when it comes relaying:
 ```ocaml
 type 'from send_relay =
   | Respond : (_, 'to) dst * (relay, 'to) packet -> relay send_relay
@@ -823,10 +830,27 @@ some of our GADTs to prove some impossible cases. For our last machine, we can
 talk about this case:
 ```ocaml
     match src, dst, packet with
-    | Exists (_, Relay_), _, _ -> .
+    | Exists (_, Relay), _, _ -> .
 ```
 
 As you can see, we can define the branch and use the `.` to disprove the case.
+THe case is not possible because the `Relay` constructor constraints some
+existential types as `(relay, 'to) src` and our `peer` type never defines
+a constructor with the role `relay` (it defines only two roles
+`Sender`/`sender` & `Recver`/`recver`) and we explicitely defined a type
+relationship between `'from` from `src` and `'from` from `peer`.
+```ocaml
+type ('role, 'non_role) peer =
+  | Sender : (sender, recver) peer
+  | Recver : (recver, sender) peer
+
+type ('from, 'to) src =
+  | Relay : (relay, 'to) src
+  | Peer : ('from, 'non_from) peer * int -> ('from, 'non_from) src
+
+type exists =
+  | Exists : ('from, 'to) peer * ('from, 'to) src -> exists
+```
 
 Another point concerns the protocol itself which, in practice, contains a few
 more packets than we have just seen. We can mention in particular the
@@ -899,27 +923,27 @@ methodology which finally adds a little more human touch to these little
 programs.
 
 [twitter]: https://twitter.com/Dinoosaure
-[mastodon]: https://perdu.com
+[mastodon]: https://mastodon.social/web/@dinosaure
 [spoke]: https://github.com/dinosaure/spoke
 [bob]: https://github.com/dinosaure/bob
-[esperanto]: https://github.com/dinosaures/esperanto
+[esperanto]: https://github.com/dinosaure/esperanto
 [drup]: https://github.com/Drup
-[printf]: https://perdu.com
-[lambda]: https://perdu.com
-[yallop]: https://perdu.com
+[printf]: https://drup.github.io/2016/08/02/difflists
+[lambda]: https://discuss.ocaml.org/t/parsing-terms-into-a-well-typed-representation-a-gadt-puzzle/8688
+[yallop]: https://www.cl.cam.ac.uk/teaching/1415/L28/gadts.pdf
 [gasche]: https://github.com/gasche
 [mirage-lambda]: https://github.com/mirage/mirage-lambda
 [tweag]: https://tweag.io/
 [chambart]: https://github.com/chambart
-[sudoku]: https://perdu.com
+[sudoku]: https://ocamlpro.com/blog/2017_04_01_ezsudoku
 [dsl]: https://perdu.com
 [armael]: https://github.com/Armael
 [builds.robur.coop]: https://builds.robur.coop
-[spoke-article]: https://perdu.com
-[download]: https://perdu.com
+[spoke-article]: https://blog.osau.re/articles/spoke.html
+[download]: https://github.com/dinosaure/bob/suites/7552450462/artifacts/311735203
 [ape-installer]: https://justine.lol/apeloader/#binfmt_misc
-[ape]: https://perdu.com
-[croc]: https://perdu.com
+[ape]: https://justine.lol/ape.html
+[croc]: https://github.com/schollz/croc
 [hannesm]: https://github.com/hannesm
 [robur.io]: https://robur.io/
 [donate]: https://robur.io/Donate
