@@ -834,7 +834,7 @@ talk about this case:
 ```
 
 As you can see, we can define the branch and use the `.` to disprove the case.
-THe case is not possible because the `Relay` constructor constraints some
+The case is not possible because the `Relay` constructor constraints some
 existential types as `(relay, 'to) src` and our `peer` type never defines
 a constructor with the role `relay` (it defines only two roles
 `Sender`/`sender` & `Recver`/`recver`) and we explicitely defined a type
