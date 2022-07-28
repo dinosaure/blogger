@@ -14,14 +14,15 @@ If you follow my blog and my [twitter][twitter] (or my [mastodon][mastodon]),
 you probably have my explanation about the implementation of a
 [Spoke protocol][spoke] and the development of a new tool: [bob][bob]
 
-The latter is a tool for sharing files between users. The goal is to get a
-software that can work everywhere thanks to [Esperanto][esperanto].
+The latter is a tool for sharing files between users. The goal is to have
+software that can run everywhere thanks to [Esperanto][esperanto].
 
 But in this article, I'm going to talk more precisely about the implementation
 of the protocol already explained in my previous article on [Spoke][spoke] but
-which introduces a new concept between peers, that of a relay. The objective
-is to implement 3 machines ensuring the good completion of the famouse
-_handshake_. And to help me implement these machines, I decided to use GADTs!
+I introduces a new concept between peers, that of a relay. The objective
+is to implement 3 state machines ensuring the good completion of the famouse
+_handshake_. And to help me implement these machines, I decided to use GADTs
+(Generalized Algebraic Data Type).
 
 There are few articles to explain GADTs like the one from [Drup][drup] which
 introduces their use to implement [a printf][printf] (as implemented in OCaml)
@@ -231,7 +232,7 @@ identity of these peers. Indeed, it is not up to the peers to define their
 identities (which is part of the handshake) but to the relay to do so.
 
 If we go back to our described protocol, we define 2 roles during the handshake
-and, a fortiori, during the exchange of a file: we have a sender and a
+and even more so, during the exchange of a file: we have a sender and a
 receiver. There are finally 3 roles in our protocol: the relay, a peer wanting
 to send a file, a peer wanting to receive a file.
 
@@ -861,14 +862,7 @@ it from the GitHub Actions repository where we systematically compile the
 program with Cosmopolitan.
 
 It's still quite simple to use<sup>[2](#fn2)</sup>:
-```sh
-$ ./bob.com send sample.txt
-Password: geetc-deu
->>> [│                            │]    0.0 B    / 13.54 MiB
-$ ./bob.com geetc-deu
-Accept from 213.245.183.59:59749 [Y/n]: Y
->>> Received a file: sample.txt.
-```
+![bob](../images/bob.gif)
 
 On Windows, drag'n and drop a file to `bob.com` works to send a file and double
 clicking on `bob.com` to receive also works - you don't have to be a computer
@@ -886,6 +880,23 @@ execute `bob.com` as a Wine application. For such case, Cosmopolitan provides
 an [installer][ape-installer] which fills `binfmt_misc` with the [APE][ape]
 format.
 
+## Conclusion
+
+We'll probably do a release of Bob in September after the holidays to polish up
+the whole distribution - and may be ensure reproducibility of the executable
+thanks to the excellent work of [Hannes][hannesm] and [robur.io][robur.io].
+
+The goal is ultimately simple, to make sure that everyone can share files on
+all platforms without any prerequisites. But the project is still
+fundamentally useful. Thanks to [robur.io][robur.io] for giving me the time to
+experiment and go further on topics I'm passionate about - and if you think
+what we're doing is fun and useful, you can of course [contribute][donate]
+financially to what we're doing.
+
+I hope this article shows another aspect of GADTs that is outside the
+`printf`/lambda-calculus box. I also hope that it shows our artisanal
+methodology which finally adds a little more human touch to these little
+programs.
 
 [twitter]: https://twitter.com/Dinoosaure
 [mastodon]: https://perdu.com
@@ -908,3 +919,7 @@ format.
 [download]: https://perdu.com
 [ape-installer]: https://justine.lol/apeloader/#binfmt_misc
 [ape]: https://perdu.com
+[croc]: https://perdu.com
+[hannesm]: https://github.com/hannesm
+[robur.io]: https://robur.io/
+[donate]: https://robur.io/Donate
