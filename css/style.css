@@ -143,7 +143,7 @@ article blockquote h4 {
 article pre {
   margin: 16px 8px;
   padding: 8px;
-  font-family: Courier;
+  font-family: 'Courier new', monospace;
   font-size: 1.2em;
   line-height: 100%;
   width: 100%;
@@ -174,7 +174,7 @@ article pre code {
 }
 
 article code {
-  font-family: Courier;
+  font-family: 'Courier new', monospace;
   font-size: 0.8em;
 }
 
