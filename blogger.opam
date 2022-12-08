@@ -23,6 +23,7 @@ depends: [
   "preface" { >= "0.1.0" }
   "logs" {>= "0.7.0" }
   "cmdliner" { >= "1.0.0"}
+  "http-lwt-client"
   "yocaml"
   "yocaml_unix"
   "yocaml_yaml"
