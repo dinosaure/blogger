@@ -41,17 +41,17 @@ let move_images target =
 
 let process_articles target =
   process_files [ "articles" ] File.is_markdown (fun article_file ->
-      let open Build in
-      create_file
-        (article_target article_file target)
-        (binary_update
-        >>> Metaformat.read_file_with_metadata
-              (module Model.Article)
-              article_file
-        >>> Markup.content_to_html ()
-        >>> Template.apply_as_template (module Model.Article) article_template
-        >>> Template.apply_as_template (module Model.Article) layout_template
-        >>^ Stdlib.snd))
+    let open Build in
+    create_file
+      (article_target article_file target)
+      (binary_update
+      >>> Metaformat.read_file_with_metadata
+            (module Model.Article)
+            article_file
+      >>> Markup.content_to_html ()
+      >>> Template.apply_as_template (module Model.Article) article_template
+      >>> Template.apply_as_template (module Model.Article) layout_template
+      >>^ Stdlib.snd))
 ;;
 
 let merge_with_page ((meta, content), articles) =

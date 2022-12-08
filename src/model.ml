@@ -51,9 +51,9 @@ module Author = struct
   ;;
 
   let inject
-      (type a)
-      (module D : Key_value.DESCRIBABLE with type t = a)
-      { name; link; email; avatar }
+    (type a)
+    (module D : Key_value.DESCRIBABLE with type t = a)
+    { name; link; email; avatar }
     =
     let avatar =
       match avatar with
@@ -88,9 +88,9 @@ module Co_author = struct
   ;;
 
   let inject
-      (type a)
-      (module D : Key_value.DESCRIBABLE with type t = a)
-      { author; contribution }
+    (type a)
+    (module D : Key_value.DESCRIBABLE with type t = a)
+    { author; contribution }
     =
     D.
       [ "author", object_ $ Author.inject (module D) author
@@ -127,14 +127,14 @@ module Article = struct
   ;;
 
   let make
-      article_title
-      article_description
-      tags
-      date
-      title
-      description
-      author
-      co_authors
+    article_title
+    article_description
+    tags
+    date
+    title
+    description
+    author
+    co_authors
     =
     let author = Option.value ~default:Author.default_user author in
     let invited_article = not (Author.equal author Author.default_user) in
@@ -156,41 +156,38 @@ module Article = struct
       let open Validate.Monad in
       V.from_string str
       >>= V.object_and (fun assoc ->
-              let open Validate.Applicative in
-              make
-              <$> V.(required_assoc string) "article.title" assoc
-              <*> V.(required_assoc string) "article.description" assoc
-              <*> V.(optional_assoc_or ~default:[] (list_of string))
-                    "tags"
-                    assoc
-              <*> V.required_assoc
-                    (Metadata.Date.from (module V))
-                    "date"
-                    assoc
-              <*> V.(optional_assoc string) "title" assoc
-              <*> V.(optional_assoc string) "description" assoc
-              <*> V.(optional_assoc (Author.from (module V))) "author" assoc
-              <*> V.(
-                    optional_assoc_or
-                      ~default:[]
-                      (list_of (Co_author.from (module V)))
-                      "coauthors"
-                      assoc))
+            let open Validate.Applicative in
+            make
+            <$> V.(required_assoc string) "article.title" assoc
+            <*> V.(required_assoc string) "article.description" assoc
+            <*> V.(optional_assoc_or ~default:[] (list_of string))
+                  "tags"
+                  assoc
+            <*> V.required_assoc (Metadata.Date.from (module V)) "date" assoc
+            <*> V.(optional_assoc string) "title" assoc
+            <*> V.(optional_assoc string) "description" assoc
+            <*> V.(optional_assoc (Author.from (module V))) "author" assoc
+            <*> V.(
+                  optional_assoc_or
+                    ~default:[]
+                    (list_of (Co_author.from (module V)))
+                    "coauthors"
+                    assoc))
   ;;
 
   let inject
-      (type a)
-      (module D : Key_value.DESCRIBABLE with type t = a)
-      { article_title
-      ; article_description
-      ; tags
-      ; date
-      ; title
-      ; description
-      ; author
-      ; co_authors
-      ; invited_article
-      }
+    (type a)
+    (module D : Key_value.DESCRIBABLE with type t = a)
+    { article_title
+    ; article_description
+    ; tags
+    ; date
+    ; title
+    ; description
+    ; author
+    ; co_authors
+    ; invited_article
+    }
     =
     let co_authors =
       List.map (fun c -> D.object_ $ Co_author.inject (module D) c) co_authors
@@ -250,9 +247,9 @@ module Articles = struct
   ;;
 
   let inject
-      (type a)
-      (module D : Key_value.DESCRIBABLE with type t = a)
-      { articles; title; description }
+    (type a)
+    (module D : Key_value.DESCRIBABLE with type t = a)
+    { articles; title; description }
     =
     ( "articles"
     , D.list
@@ -267,9 +264,9 @@ module Articles = struct
 end
 
 let article_object
-    (type a)
-    (module D : Key_value.DESCRIBABLE with type t = a)
-    (article, url)
+  (type a)
+  (module D : Key_value.DESCRIBABLE with type t = a)
+  (article, url)
   =
   D.object_ (("url", D.string url) :: Article.inject (module D) article)
 ;;
@@ -288,9 +285,9 @@ module Tag = struct
   ;;
 
   let inject
-      (type a)
-      (module D : Key_value.DESCRIBABLE with type t = a)
-      { tag; tags; articles; title; description }
+    (type a)
+    (module D : Key_value.DESCRIBABLE with type t = a)
+    { tag; tags; articles; title; description }
     =
     ("tag", D.string tag)
     :: ("root", D.string "..")

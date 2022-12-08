@@ -3,14 +3,19 @@
  (promote (until-clean))
  (libraries
   logs
+  logs.fmt
+  logs.cli
+  fmt
+  fmt.tty
+  fmt.cli
   cmdliner
   preface
-  irmin-unix
   mirage-clock-unix
   http-lwt-client
+  git-unix
   yocaml
   yocaml_yaml
   yocaml_markdown
   yocaml_unix
-  yocaml_irmin
+  yocaml_git
   yocaml_jingoo))

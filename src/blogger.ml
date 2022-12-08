@@ -128,9 +128,10 @@ let unix_ctx_with_ssh () =
   |> Mimic.fold
        Smart_git.git_transmission
        Fun.[ req Smart_git.git_scheme ]
-       ~k:(function
-         | `SSH -> Lwt.return_some `Exec
-         | _ -> Lwt.return_none)
+       ~k:
+         (function
+          | `SSH -> Lwt.return_some `Exec
+          | _ -> Lwt.return_none)
   |> Mimic.fold
        ssh_edn
        Fun.
@@ -144,55 +145,30 @@ let unix_ctx_with_ssh () =
        ~k:k0
 ;;
 
-let build_and_push _quiet target branch author author_email remote hook =
-  let module Store = Irmin_unix.Git.FS.KV (Irmin.Contents.String) in
-  let module Sync = Irmin.Sync.Make (Store) in
-  let failwith_pull_error = function
-    | Ok v -> Lwt.return v
-    | Error (`Msg err) -> failwith err
-    | Error (`Conflict err) -> Fmt.failwith "conflict: %s" err
-  in
-  let failwith_push_error = function
-    | Ok v -> Lwt.return v
-    | Error err -> Fmt.failwith "%a" Sync.pp_push_error err
-  in
-  let target = Fpath.to_string target in
-  let config = Irmin_git.config target in
+let build_and_push _quiet remote hook =
   let fiber () =
-    let open Lwt.Infix in
-    unix_ctx_with_ssh ()
-    >>= fun ctx ->
-    Store.remote ~ctx remote
-    >>= fun upstream ->
-    Store.Repo.v config
-    >>= fun repository ->
-    Store.of_branch repository branch
-    >>= fun active_branch ->
-    Sync.pull active_branch upstream `Set
-    >|= failwith_pull_error
-    >>= fun _ ->
-    Yocaml_irmin.execute
-      (module Yocaml_unix)
-      (module Pclock)
-      (module Store)
-      ~author
-      ~author_email:(Emile.to_string author_email)
-      ~branch
-      repository
-      (program ~target:"")
-    >>= fun () ->
-    Sync.push active_branch upstream
-    >|= failwith_push_error
-    >>= fun _ ->
+    let open Lwt.Syntax in
+    let* ctx = unix_ctx_with_ssh () in
+    let* () =
+      Yocaml_git.execute
+        (module Yocaml_unix)
+        (module Pclock)
+        ~ctx
+        remote
+        (program ~target:"")
+    in
     match hook with
     | None -> Lwt.return_unit
     | Some hook ->
-      Http_lwt_client.one_request
+      let open Lwt.Infix in
+      Http_lwt_client.request
         ~config:(`HTTP_1_1 Httpaf.Config.default)
         ~meth:`GET
         (Uri.to_string hook)
+        (fun () _ -> Lwt.return_unit)
+        ()
       >>= (function
-      | Ok (_response, _body) -> Lwt.return_unit
+      | Ok (_response, ()) -> Lwt.return_unit
       | Error (`Msg err) -> failwith err)
   in
   Lwt_main.run (fiber ())
@@ -316,39 +292,6 @@ let push_cmd =
       "Push the blog (from the specified directory) into a Git repository"
   in
   let exits = Cmd.Exit.defaults in
-  let path_arg =
-    let doc =
-      Format.asprintf
-        "Specify where we build the website (default: %a)"
-        Fpath.pp
-        default_target
-    in
-    let arg = Arg.info ~doc [ "destination" ] in
-    Arg.(value & opt (conv (Fpath.of_string, Fpath.pp)) default_target & arg)
-  in
-  let author_arg =
-    let doc = "The author of the commit" in
-    let arg = Arg.info ~doc [ "author" ] in
-    Arg.(required & opt (some string) None & arg)
-  in
-  let author_email_arg =
-    let email =
-      Arg.conv
-        ( Rresult.(
-            fun str ->
-              Emile.of_string str
-              |> R.reword_error (R.msgf "%a" Emile.pp_error))
-        , Emile.pp_mailbox )
-    in
-    let doc = "The email address of the author" in
-    let arg = Arg.info ~doc [ "email" ] in
-    Arg.(required & opt (some email) None & arg)
-  in
-  let branch_arg =
-    let doc = "The active Git branch name" in
-    let arg = Arg.info ~doc [ "b"; "branch" ] in
-    Arg.(value & opt string "master" & arg)
-  in
   let remote_arg =
     let remote =
       let parser str =
@@ -373,17 +316,7 @@ let push_cmd =
     Arg.(value & opt (some (conv (of_string, Uri.pp))) None & arg)
   in
   let info = Cmd.info "push" ~version ~doc ~exits ~man in
-  Cmd.v
-    info
-    Term.(
-      const build_and_push
-      $ setup_logs
-      $ path_arg
-      $ branch_arg
-      $ author_arg
-      $ author_email_arg
-      $ remote_arg
-      $ hook_arg)
+  Cmd.v info Term.(const build_and_push $ setup_logs $ remote_arg $ hook_arg)
 ;;
 
 let cmd =
