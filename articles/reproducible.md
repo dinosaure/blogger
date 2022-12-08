@@ -177,11 +177,12 @@ secure but will give signals and reasons why you should trust us.
 
 ## `orb`
 
-[`orb` is the initial tool that will both launch the build and aggregate the
+`orb` is the initial tool that will both launch the build and aggregate the
 information to define this famous context. From the latter, the user wants to
-restart the build and: 1) show for a different context (an update), the software
-remains the same 2) ensure that for the same context, the software remains the
-same 3) notify differences if 2 contexts do not produce the same software
+restart the build and:
+1) show for a different context (an update), the software remains the same
+2) ensure that for the same context, the software remains the same
+3) notify differences if 2 contexts do not produce the same software
 
 In detail, `orb` expects an OPAM package which is rather straightforward for
 OCaml software. Indeed, one can introspect the reproducibility at several
