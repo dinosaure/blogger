@@ -165,7 +165,7 @@ let build_and_push _quiet remote hook =
         ~config:(`HTTP_1_1 Httpaf.Config.default)
         ~meth:`GET
         (Uri.to_string hook)
-        (fun () _ -> Lwt.return_unit)
+        (fun _ () _ -> Lwt.return_unit)
         ()
       >>= (function
       | Ok (_response, ()) -> Lwt.return_unit
