@@ -1,7 +1,7 @@
 opam-version: "2.0"
 version: "dev"
 synopsis: " The source code of the generator and the content of my blog, naively using YOCaml "
-maintainer: "xhtmlboi@gmail.com"
+maintainer: "romain.calascibetta@gmail.com"
 authors: [ "The XHTMLBoy <xhtmlboi@gmail.com>" ]
 
 build: [
@@ -13,9 +13,9 @@ build: [
 
 license: "GPL-3.0-or-later"
 tags: [ "angry" "cuisine" "nerd" "ocaml" "preface" ]
-homepage: "https://github.com/xhtmlboi/blogger"
-dev-repo: "git://github.com/xhtmlboi/blogger.git"
-bug-reports: "https://github.com/xhtmlboi/blogger/issues"
+homepage: "https://github.com/dinosaure/blogger"
+dev-repo: "git://github.com/dinosaure/blogger.git"
+bug-reports: "https://github.com/dinosaure/blogger/issues"
 
 depends: [
   "ocaml" { >= "4.11.1" }
@@ -33,10 +33,10 @@ depends: [
 ]
 
 pin-depends: [
-  ["yocaml.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_unix.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_yaml.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_markdown.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_jingoo.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_git.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
+  ["yocaml_unix.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
+  ["yocaml_yaml.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
+  ["yocaml_markdown.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
+  ["yocaml_jingoo.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
+  ["yocaml_git.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
 ]

@@ -145,31 +145,64 @@ let unix_ctx_with_ssh () =
        ~k:k0
 ;;
 
-let build_and_push _quiet remote hook =
+let run_git_config key = function
+  | Some value -> Some value
+  | None ->
+    let open Bos in
+    let value = OS.Cmd.run_out Cmd.(v "git" % "config" % "--global" % key) in
+    (match OS.Cmd.out_string value with
+     | Ok (value, _) -> Some value
+     | Error _ -> None)
+;;
+
+let get_name_and_email name email =
+  let name = run_git_config "user.name" name in
+  let email = run_git_config "user.email" email in
+  name, email
+;;
+
+let name_and_email =
+  let name_arg =
+    let doc = "Name of the committer." in
+    Cmdliner.Arg.(value & opt (some string) None & info [ "name" ] ~doc)
+  in
+  let email_arg =
+    let doc = "Email of the committer." in
+    Cmdliner.Arg.(value & opt (some string) None & info [ "email" ] ~doc)
+  in
+  Cmdliner.Term.(const get_name_and_email $ name_arg $ email_arg)
+;;
+
+let build_and_push _quiet remote (author, email) hook =
   let fiber () =
     let open Lwt.Syntax in
     let* ctx = unix_ctx_with_ssh () in
-    let* () =
+    let* res =
       Yocaml_git.execute
         (module Yocaml_unix)
         (module Pclock)
         ~ctx
+        ?author
+        ?email
         remote
         (program ~target:"")
     in
-    match hook with
-    | None -> Lwt.return_unit
-    | Some hook ->
-      let open Lwt.Infix in
-      Http_lwt_client.request
-        ~config:(`HTTP_1_1 Httpaf.Config.default)
-        ~meth:`GET
-        (Uri.to_string hook)
-        (fun _ () _ -> Lwt.return_unit)
-        ()
-      >>= (function
-      | Ok (_response, ()) -> Lwt.return_unit
-      | Error (`Msg err) -> failwith err)
+    match res with
+    | Error (`Msg err) -> Fmt.failwith "build-and-push: %s." err
+    | Ok () ->
+      (match hook with
+       | None -> Lwt.return_unit
+       | Some hook ->
+         let open Lwt.Infix in
+         Http_lwt_client.request
+           ~config:(`HTTP_1_1 Httpaf.Config.default)
+           ~meth:`GET
+           (Uri.to_string hook)
+           (fun _ () _ -> Lwt.return_unit)
+           ()
+         >>= (function
+         | Ok (_response, ()) -> Lwt.return_unit
+         | Error (`Msg err) -> failwith err))
   in
   Lwt_main.run (fiber ())
 ;;
@@ -316,7 +349,14 @@ let push_cmd =
     Arg.(value & opt (some (conv (of_string, Uri.pp))) None & arg)
   in
   let info = Cmd.info "push" ~version ~doc ~exits ~man in
-  Cmd.v info Term.(const build_and_push $ setup_logs $ remote_arg $ hook_arg)
+  Cmd.v
+    info
+    Term.(
+      const build_and_push
+      $ setup_logs
+      $ remote_arg
+      $ name_and_email
+      $ hook_arg)
 ;;
 
 let cmd =
