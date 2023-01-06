@@ -259,7 +259,7 @@ then needs to be able to "resolve" the domains (and more specifically the `MX`
 field of those domains).
 
 ```sh
-$ dig +shor MX gmail.com
+$ dig +short MX gmail.com
 5 gmail-smtp-in.l.google.com.
 20 alt2.gmail-smtp-in.l.google.com.
 30 alt3.gmail-smtp-in.l.google.com.
@@ -478,6 +478,7 @@ update our primary DNS server.
 
 ```sh
 $ cd zone
+$ git pull
 $ echo "smtp A 76.8.60.93" >> x25519.net
 $ ... modify the serial number on the SOA record ...
 $ git add x25519.net
@@ -499,6 +500,7 @@ $ cat >submission.sh <<EOF
 #!/bin/bash
 
 albatross-client-local create --mem=256 --net=service:service submission submission.hvt \
+	--restart-on-fail \
 	--arg="--destination=10.0.0.4" \
 	--arg="--dns-key=personal._update.x25519.net:SHA256:PAPPkecDvEBnhqTzG5Xsbrbi7W0QY7TpVaEMxndMv2M=" \
 	--arg="--dns-server=10.0.0.3" \
@@ -636,3 +638,4 @@ articles.
 [yopmail]: https://yopmail.com/
 [contruno]: https://github.com/dinosaure/contruno
 [certbot]: https://certbot.eff.org/
+[dnschecker]: https://dnschecker.org/

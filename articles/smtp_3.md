@@ -103,7 +103,7 @@ host [vm: :spamfilter]: success: created VM
 
 The spam filter works on the basis of an already calculated database. It is
 therefore fixed within the unikernel. If you want to change it, you have to
-recalculate the db and recompile the unikernel with it.
+recalculate the database and recompile the unikernel with it.
 
 The filter is a simple Bayesian filter from a word dictionary. The unikernel
 adds the field `X-Spamtacus` with 3 possible labels:
@@ -264,15 +264,15 @@ account! The loop is complete! In this email, a code has been sent to you that
 you will need to use to confirm your identity with Gmail.
 
 Let's recap:
-1) you set up your Gmail <login>@gmail.com to have a new identity
+1) you set up your Gmail `<login>@gmail.com` to have a new identity
 2) it asks you for the submission server information
 3) Gmail will then try your credentials to see if everything is correct
-4) Gmail will then email <login>@x25519.net, so this time it will talk to our
+4) Gmail will then email `<login>@x25519.net`, so this time it will talk to our
    last deployed unikernel (the verifier)
 5) The email will go through our spam filter and land on the relay
-6) The relay will look at what <login>@x25519.net is associated with, say
-   <login>@gmail.com
-7) The relay will then send the email back to <login>@gmail.com
+6) The relay will look at what `<login>@x25519.net` is associated with, say
+   `<login>@gmail.com`
+7) The relay will then send the email back to `<login>@gmail.com`
 8) You should receive it in your mailbox
 
 We can confirm these passages by looking at the sources of our email received by
@@ -367,5 +367,8 @@ happy new year and hack well!
 [afl-fuzz]: https://lcamtuf.coredump.cx/afl/
 [postfix]: http://www.postfix.org/
 [launchvps]: https://cp.launchvps.com/index.php
-[intodns.com]: https://intodns.com/
+[intodns]: https://intodns.com/
 [robur-donate]: https://robur.coop/Donate
+[albatross]: https://github.com/roburio/albatross
+[solo5]: https://github.com/solo5/solo5
+[reproducibility]: reproducible.html

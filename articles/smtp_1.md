@@ -248,9 +248,9 @@ view, it is not necessary. On the other hand, for our future unikernels for
 emails, some will use this DNS resolver to resolve the MX field and to know
 where the email server where we have to send our emails is located.
 
-Fortunately, the Robur association builds and distributes unikernels for you. We
-could look at how to build a unikernel here but we'll concentrate on deployment.
-So you can download the image (`bin/resolver.hvt`) here:
+Fortunately, the [Robur][robur] association builds and distributes unikernels
+for you. We could look at how to build a unikernel here but we'll concentrate on
+deployment. So you can download the image (`bin/resolver.hvt`) here:
 
 [https://builds.osau.re/job/dns-resolver/build/latest/][dns-resolver]
 
@@ -328,6 +328,8 @@ $ git commit --allow-empty -m "First commit"
 Here, we create what will become our Git repository<sup>[1](#fn1)</sup>
 `zone.git` which will contain our [zone file][zone-file] for our domain name.
 
+<hr />
+
 <tag id="fn1">**1**</tag>: A common problem is the branch name, it seems to me
 that the Debian 11 version of Git still uses the name "master" (instead of
 "main"). In our case, we'll specify the branch in the arguments expected by our
@@ -388,6 +390,7 @@ In my case, I must notify gandi.net that:
   secondary DNS server that Gandi offers<sup>[2](#fn2)</sup>)
 - `ns1.x25519.net` points to `76.8.60.93` (my VPS) as "Glue record"
 
+<hr />
 
 <tag id="fn2">**2**</tag>: At the moment I have some issues with Gandi and it
 seems that the transfer between the primary and secondary server requires some
@@ -450,7 +453,7 @@ to modify the zone file a little bit but, thanks to the update mechanism, we
 will not need to restart our server.
 
 Note that the script to run the unikernel uses the `ssh.key` file. This is the
-file in which we have saved our stolen SSH key.
+file in which we have saved our "in the fly" SSH key.
 
 ```sh
 $ wget https://builds.robur.coop/job/dns-primary-git/build/latest/f/bin/primary-git.hvt
@@ -573,3 +576,4 @@ MirageOS!
 [dns-mirage]: https://github.com/mirage/ocaml-dns/
 [robur]: https://robur.coop/
 [memory-leak]: https://github.com/mirage/mirage-tcpip/issues/499
+[robur]: https://robur.coop/
