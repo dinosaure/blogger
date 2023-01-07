@@ -21,6 +21,11 @@ on a specific branch (like `repository.git#gh-pages`). By default, the tool can
 use `ssh` (with recorded private SSH key with `ssh-agent`) to push into a Git
 repository. It can notify an `unipi` unikernel with the `--hook` option (and
 let it to resynchronize values with the new commit).
+```sh
+$ blogger push -r git@localhost:blog.git --hook http://10.0.0.1/hook \
+  [--name "Romain Calascibetta"] \
+  [--email romain.calascibetta@gmail.com]
+```
 
 For more details, you can see my article:
 [Again, re-update of my blog after 2 years.][article]

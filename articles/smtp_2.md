@@ -125,7 +125,7 @@ iI9jJBB/XLd6r0C1cNobumjKRyMfnGKKb6nYFJ5dD48=
 $ cat >dkim.key <<EOF
 iI9jJBB/XLd6r0C1cNobumjKRyMfnGKKb6nYFJ5dD48=
 EOF
-$ wget https://builds.osau.re/job/signer-hvt/build/latest/f/bin/signer.hvt
+$ wget https://builds.osau.re/job/signer/build/latest/f/bin/signer.hvt
 $ cat >signer.sh <<EOF
 #!/bin/bash
 
@@ -324,7 +324,7 @@ As with the signer, we will download our unikernel from our infrastructure and
 create a shell script to properly launch our unikernel with `albatross`.
 
 ```sh
-$ wget https://builds.osau.re/job/relay-hvt/build/latest/f/bin/relay.hvt
+$ wget https://builds.osau.re/job/relay/build/latest/f/bin/relay.hvt
 $ cat >relay.sh <<EOF
 #!/bin/bash
 
@@ -493,7 +493,7 @@ successful TSIG signed notify!
 We can now launch our unikernel correctly.
 
 ```sh
-$ wget https://builds.osau.re/job/submission-hvt/build/latest/f/bin/submission.hvt
+$ wget https://builds.osau.re/job/submission/build/latest/f/bin/submission.hvt
 $ dd if=/dev/urandom bs=32 count=1|base64 -
 DNEyBXLa7959WAL53oxwi54EIaN+2jN7whKNXMfRJHw=
 $ cat >submission.sh <<EOF

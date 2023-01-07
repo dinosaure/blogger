@@ -1,6 +1,5 @@
 (executable
  (name blogger)
- (promote (until-clean))
  (libraries
   logs
   logs.fmt

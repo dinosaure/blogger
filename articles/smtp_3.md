@@ -43,7 +43,7 @@ library...) and is available [here][spamtacus].
 Let's test this unikernel to see:
 
 ```sh
-$ https://builds.osau.re/job/spamfilter-hvt/build/latest/f/bin/spamfilter.hvt
+$ https://builds.osau.re/job/spamfilter/build/latest/f/bin/spamfilter.hvt
 $ cat >spamfilter.sh <<EOF
 #!/bin/bash
 
@@ -152,7 +152,7 @@ resolver (10.0.0.2). It also needs a TLS certificate on our domain x25519.net
 `STARTTLS`<sup>[1](#fn1)</sup>.
 
 ```sh
-$ wget https://builds.osau.re/job/verifier-hvt/build/latest/f/bin/verifier.hvt
+$ wget https://builds.osau.re/job/verifier/build/latest/f/bin/verifier.hvt
 $ dd if=/dev/urandom bs=32 count=1|base64 -
 rnM63JSKxhfo1L5WedIPlRD57bnfjg7SOJ47DhAlaAg=
 $ cat >verifier.sh <<EOF
