@@ -137,8 +137,8 @@ RFC-compliant emails that any email reading software should handle:
 
 We will finally finish with our last unikernel, the one that will deal with the
 famous port 25, the gates of hell! Indeed, this is where all emails to
-`x25519.net` will arrive and there may even be emails to other destinations
-(remember the routes in the email addresses...).
+`x25519.net`<sup>[1](#fn1)</sup> will arrive and there may even be emails to
+other destinations (remember the routes in the email addresses...).
 
 The special thing about this one is that it knows the public IP address of the
 sender and so it is through this one that we can check the SPF data of the
@@ -149,7 +149,7 @@ result of the SPF verification.
 This unikernel will do its SPF check from DNS requests, so it will use our DNS
 resolver (10.0.0.2). It also needs a TLS certificate on our domain x25519.net
 (not smtp.x25519.net) to give the senders the possibility to use
-`STARTTLS`<sup>[1](#fn1)</sup>.
+`STARTTLS`<sup>[2](#fn2)</sup>.
 
 ```sh
 $ wget https://builds.osau.re/job/verifier/build/latest/f/bin/verifier.hvt
@@ -185,7 +185,7 @@ $ iptables -t nat -A SMTP ! -s 10.0.0.9/32 -p tcp -m tcp --dport 25 \
 $ iptables -t nat -A PREROUTING -m addrtype --dst-type LOCAL -j SMTP
 ```
 
-Finally, we need to fill in the MX field<sup>[2](#fn2)</sup> to point to our
+Finally, we need to fill in the MX field<sup>[3](#fn3)</sup> to point to our
 server so that the other services can send us an email. Before you change it,
 make sure you **resynchronise**! `letsencrypt` has since added quite a bit of
 information to the zone file.
@@ -204,12 +204,19 @@ $ ./update.sh
 
 <hr />
 
-<tag id="fn1">**1**</tag>: This is because the first state in which an email is
+<tag id="fn1">**2**</tag>: Hannes notified me that the domain name used to
+receive the emails is not necessarily the same as our email addresses (but
+necessarily the same as the one from the MX record) Basically, we could set our
+`verifier` to `mail.x25519.net` (and just update the MX record) instead of
+`x25519.net`. In the current version of `ptt`, this is not possible but I'll fix
+it as soon as possible.
+
+<tag id="fn2">**2**</tag>: This is because the first state in which an email is
 sent is **unencrypted**! The server (our unikernel) is expected to implement
 `STARTTLS` to wrap the communication in TLS. We will therefore obtain this
 certificate with `letsencrypt` as with our submission unikernel.
 
-<tag id="fn2">**2**</tag>: A notion of "priority" exists in the MX field.
+<tag id="fn3">**3**</tag>: A notion of "priority" exists in the MX field.
 Indeed, if the first service is not available, one can always communicate with
 the next. What could be interesting is to put our unikernel as the first
 available service and then put a more conventional service ([postfix][postfix])

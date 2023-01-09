@@ -269,7 +269,7 @@ $ cat resolver.sh <<EOF
 albatross-client-local create --mem=64 \
   --net=service:service resolver resolver.hvt \
   --restart-on-fail \
-  --arg="--ipv4=10.0.0.2" \
+  --arg="--ipv4=10.0.0.2/24" \
   --arg="--ipv4-gateway=10.0.0.1"
 EOF
 $ chmod +x resolver.sh
@@ -528,6 +528,17 @@ number (here `1`). For each modification/addition, you must increment this
 number otherwise these modifications will not be taken into account by the other
 DNS servers. But we will see that in time.
 
+<hr />
+
+Hannes gave me a better way to update your zone file without you needing to
+install `dns-cli` (which can take a while given the machine we have). Indeed,
+the update mechanism can be done with `dig`:
+
+```sh
+$ dig SOA x25519.net @10.0.0.3 +opcode=notify -y \
+  hmac-sha256:personal._update:PAPPkecDvEBnhqTzG5Xsbrbi7W0QY7TpVaEMxndMv2M=
+```
+
 ### Conclusion
 
 We finally deployed what will be essential for our unikernels and emails, our
@@ -559,6 +570,8 @@ records". Anyway, as far as my services but also Robur's are concerned, again,
 this is perhaps the oldest unikernel used. Reason enough to go ahead and use
 MirageOS!
 
+The next article is available [here][next-article]!
+
 [launchvps]: https://cp.launchvps.com/index.php
 [gandi.net]: https://gandi.net/
 [uncensoreddns]: https://blog.uncensoreddns.org/
@@ -577,3 +590,4 @@ MirageOS!
 [robur]: https://robur.coop/
 [memory-leak]: https://github.com/mirage/mirage-tcpip/issues/499
 [robur]: https://robur.coop/
+[next-article]: smtp_2.html

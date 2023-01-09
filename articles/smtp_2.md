@@ -10,7 +10,8 @@ tags:
   - Deployement
 ---
 
-In our previous article, we saw how to deploy 2 essential services for emails:
+In our [previous][previous-article] article, we saw how to deploy 2 essential
+services for emails:
 the DNS stack. This basically means that:
 1) you have a domain name (this will be your identity on the Internet)
 2) this domain name is managed by your unikernel (you don't have any
@@ -628,7 +629,7 @@ senders).
 
 Anyway, you can send emails under your authority now, they will probably get
 spammed for some but that problem is outside the scope of this series of
-articles.
+articles. The next article is available [here][next-article]!
 
 [blaze]: https://github.com/dinosaure/blaze
 [received]: https://twitter.com/Dinoosaure/status/1372903235778908163
@@ -639,3 +640,5 @@ articles.
 [contruno]: https://github.com/dinosaure/contruno
 [certbot]: https://certbot.eff.org/
 [dnschecker]: https://dnschecker.org/
+[next-article]: smtp_3.html
+[previous-article]: smtp_1.html
