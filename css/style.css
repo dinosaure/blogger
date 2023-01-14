@@ -8,7 +8,7 @@
    behaviour! */
 
 body {
-  margin: 32px;
+  margin: 32px auto;
   padding: 0;
   max-width: 840px;
   background-color: #fff;
@@ -79,7 +79,7 @@ footer {
 .list-articles > li {
   padding: 0;
   margin: 0;
-  margin-bottom: 32px;
+  margin-bottom: 10px;
   display: flex;
   flex-direction: row;
 }
@@ -122,17 +122,17 @@ article h1 {
 
 article h2 {
   font-size: 1.6em;
-  margin-top: 64px;
+  margin-top: 8px;
 }
 
 article h3 {
   font-size: 1.4em;
-  margin-top: 32px;
+  margin-top: 4px; 
 }
 
 article h4 {
   font-size: 1.2em;
-  margin-top: 16px;
+  margin-top: 2px;
 }
 
 article blockquote h4 {
