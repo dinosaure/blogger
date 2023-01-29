@@ -33,10 +33,10 @@ depends: [
 ]
 
 pin-depends: [
-  ["yocaml.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
-  ["yocaml_unix.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
-  ["yocaml_yaml.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
-  ["yocaml_markdown.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
-  ["yocaml_jingoo.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
-  ["yocaml_git.dev" "git+https://github.com/dinosaure/yocaml.git#upgrade-git-kv"]
+  ["yocaml.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml_unix.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml_yaml.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml_markdown.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml_jingoo.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml_git.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
 ]
