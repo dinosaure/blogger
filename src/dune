@@ -12,6 +12,7 @@
   mirage-clock-unix
   http-lwt-client
   git-unix
+  cmarkit
   yocaml
   yocaml_yaml
   yocaml_markdown

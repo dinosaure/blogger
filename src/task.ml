@@ -1,6 +1,6 @@
 open Yocaml
 module Metaformat = Yocaml_yaml
-module Markup = Yocaml_markdown
+module Markup = Yocaml_cmarkit
 module Template = Yocaml_jingoo
 
 let css_target target = "css" |> into target
