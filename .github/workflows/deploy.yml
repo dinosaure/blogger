@@ -14,7 +14,7 @@ jobs:
       - name: Build
         uses: ocaml/setup-ocaml@v2
         with:
-          ocaml-compiler: 4.13.x
+          ocaml-compiler: 4.14.x
           opam-depext-flags: --with-test
 
       - run: opam pin add -y .
