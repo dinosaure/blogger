@@ -15,7 +15,7 @@
   cmarkit
   yocaml
   yocaml_yaml
-  yocaml_markdown
+  yocaml_cmark
   yocaml_unix
   yocaml_git
   yocaml_jingoo))
