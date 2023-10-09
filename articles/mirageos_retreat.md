@@ -330,7 +330,7 @@ More generally, I observed a lot of interaction between mro and the other
 participants. This retreat was able to bring in people whose experience could
 really help mro - and that's really cool!
 
-### MirageOS & promox
+### MirageOS & proxmox
 
 I also had quite a few discussions with Patrick. With him and also during the
 meeting about the future of MirageOS, one issue came to light: how to deploy
@@ -339,7 +339,7 @@ fraud". For example, the series of articles on how to deploy an SMTP server is
 clearly not what I consider to be a good solution.
 
 I advised him to look at the MirageOS "virtio" target and try to integrate that
-into [promox][promox]. As it stands, it seems to me that he has managed to do
+into [proxmox][proxmox]. As it stands, it seems to me that he has managed to do
 this, which confirms what we thought was technically possible (although
 [Kate][kit-ty-kate] did come back with [a bug][halt-bug] about it!). But from
 what I understand, a "turnkey" solution would be perfect given the lack of
@@ -433,7 +433,7 @@ you participate in this community :) !
 [dkml]: https://github.com/diskuv/dkml-installer-ocaml
 [esperanto]: https://github.com/dinosaure/esperanto
 [musl]: https://musl.libc.org/
-[promox]: https://www.proxmox.com/de/
+[proxmox]: https://www.proxmox.com/de/
 [kit-ty-kate]: https://github.com/kit-ty-kate
 [halt-bug]: https://github.com/Solo5/solo5/issues/499
 [robur.io]: https://robur.io/
