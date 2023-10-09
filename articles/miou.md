@@ -342,3 +342,8 @@ me, will be a little annoyed at having to make these points explicit.
 
 Once again, Miou is no better or worse. It's just a question of explaining these
 _details_ as we do here.
+
+[twitter]: https://twitter.com/Dinoosaure/status/1690987136814874624
+[robur]: https://robur.coop/
+[moonpool]: https://github.com/c-cube/moonpool
+[documentation]: https://docs.osau.re/miou/
