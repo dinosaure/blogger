@@ -27,7 +27,7 @@ depends: [
   "yocaml"
   "yocaml_unix"
   "yocaml_yaml"
-  "yocaml_markdown"
+  "yocaml_cmark"
   "yocaml_git"
   "yocaml_jingoo"
 ]
