@@ -193,8 +193,9 @@ Finally, we will install `albatross` (and the micro-kernel [Solo5][solo5]) which
 allows us to deploy our unikernels correctly:
 ```sh
 $ apt install gnupg
-$ wget -qO- https://apt.robur.coop/gpg.pub | sudo apt-key add -
-$ echo "deb https://apt.robur.coop ubuntu-20.04 main" >> /etc/apt/sources.list
+$ curl -fsSL https://apt.robur.coop/gpg.pub | gpg --dearmor > /usr/share/keyrings/apt.robur.coop.gpg
+$ echo "deb [signed-by=/usr/share/keyrings/apt.robur.coop.gpg] https://apt.robur.coop ubuntu-20.04 main" > /etc/apt/sources.list.d/robur.list
+# replace ubuntu-20.04 with e.g. debian-11 on a debian buster machine
 $ apt update
 $ apt install solo5 albatross
 $ systemctl enable albatross_stats

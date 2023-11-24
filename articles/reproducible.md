@@ -276,8 +276,9 @@ incorporating the necessary elements to interface well with `systemd` (for
 Debian) or FreeBSD. And to enable the launch of `orb`, we simply use `docker` to
 launch Ubuntu, install `orb` and run the command. 
 ```shell=bash
-$ wget -qO- https://apt.robur.coop/gpg.pub | sudo apt-key add -
-# echo "deb https://apt.robur.coop ubuntu-20.04 main" >> /etc/apt/sources.list
+$ curl -fsSL https://apt.robur.coop/gpg.pub | gpg --dearmor > /usr/share/keyrings/apt.robur.coop.gpg
+# echo "deb [signed-by=/usr/share/keyrings/apt.robur.coop.gpg] https://apt.robur.coop ubuntu-20.04 main" > /etc/apt/sources.list.d/robur.list
+/ replace ubuntu-20.04 with e.g. debian-11 on a debian buster machine
 $ sudo apt update
 $ sudo apt install builder
 $ sudo systemctl start builder
