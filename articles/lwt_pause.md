@@ -173,10 +173,6 @@ of [code][ocaml-git-both].
 
 In our example with ocaml-git, the problem "shouldn't" appear because, in this
 case, both the left and right side do I/O (the left side binds into a socket
-while the right side saves Git objects in your file system).
-
-In our example with ocaml-git, the problem "shouldn't" appear because, in this
-case, both the left and right side do I/O (the left side binds into a socket
 while the right side saves Git objects in your file system). So, in our tests
 with `Git_unix`, we were able to see that the analysis (right-hand side) was
 well executed and 'interleaved' with the reception of objects from the network.
@@ -252,13 +248,13 @@ I haven't mentioned another problem we encountered with [Armael][armael] when
 implementing [multipart_form][multipart_form] where the use of stream meant that
 Lwt didn't interleave the two processes and the use of a _bounded stream_ was
 required. Again, even when it comes to I/O, Lwt always tries to go as far as
-possible in one two branches of a Lwt‧both.
+possible in one of two branches of a `Lwt.both`.
 
 This allows us to conclude that beyond the monad, Lwt has subtleties in its
 behaviour which may be different from another scheduler such as Async (hence the
 incompatibility between the two, which is not just of the `'a t` type).
 
-### Disgression on Miou
+### Digression on Miou
 
 That's why we put so much emphasis on the notion of availability when it comes
 to Miou: to avoid repeating the mistakes of the past. The choices that can be
@@ -277,7 +273,6 @@ we've described here, **an effect yields**!
 As far as opam-mirror is concerned, we now have an unikernel that is available
 even if it attempts to clone a Git repository and save Git objects in memory. At
 least, an HTTP service can co-exist with ocaml-git!
-
 
 I hope we'll be able to use it at [the next retreat][retreat], which I invite
 you to attend to talk more about Lwt, scheduler, Git and unikernels!
