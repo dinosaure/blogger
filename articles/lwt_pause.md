@@ -194,9 +194,9 @@ well executed and 'interleaved' with the reception of objects from the network.
 ### Composability
 
 However, if we go back to our initial problem, we were talking about our
-opam-mirror unikernel. As you might expect, there is no MirageOS file system.
-So, in the case of opam-mirror, we use the ocaml-git memory implementation:
-`Git_mem`.
+opam-mirror unikernel. As you might expect, there is no standalone MirageOS file
+system (and many of our unikernels don't need one). So, in the case of
+opam-mirror, we use the ocaml-git memory implementation: `Git_mem`.
 
 `Git_mem` is different in that Git objects are simply stored in a `Hashtbl`.
 There is no cooperation point when it comes to obtaining Git objects from this
