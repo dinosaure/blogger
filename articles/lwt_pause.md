@@ -13,17 +13,20 @@ breaks: false
 ---
 
 Here's a concrete example of the notion of availability and the scheduler used
-(in this case Lwt). As you know, at Robur we have developed a unikernel:
+(in this case Lwt). As you may know, at Robur we have developed a unikernel:
 [opam-mirror][opam-mirror]. It launches an HTTP service that can be used as an
-OPAM overlay available from a Git repository.
+OPAM overlay available from a Git repository (with `opam repository add <name>
+<url>`).
 
 The purpose of such an unikernel was to respond to a failure of the official
-repository (which fortunately did not last long) and to offer decentralisation
-of such a service (you can use https://opam.robur.coop!).
+repository which fortunately did not last long and to offer decentralisation
+of such a service. You can use https://opam.robur.coop!
 
-It was also useful at the Mirage retreat, where we don't necessarily have a
-great internet connection. Caching packets for our OCaml users on the local
-network has benefited us in terms of our Internet bill.
+It was also useful at the Mirage retreat, where we don't usually have a
+great internet connection. Caching packages for our OCaml users on the local
+network has benefited us in terms of our Internet bill by allowing the OCaml
+users to fetch opam packages over the local network instead of over the shared,
+metered 4G Internet conncetion.
 
 Finally, it's a unikernel that I also use on my server for my software
 [reproducibility service][reproducibility] in order to have an overlay for my
@@ -40,10 +43,10 @@ wait ~10 min before the service offered by the unikernel was available.
 
 ## Availability
 
-If you follow my articles, as far as Miou is concerned, from the outset there
-was talk of the notion of availability if we were to make yet another new
-scheduler for OCaml 5. We emphasised this notion because we had quite a few
-problems on this subject and Lwt.
+If you follow my articles, as far as Miou is concerned, from the outset I talk
+of the notion of availability if we were to make yet another new scheduler for
+OCaml 5. We emphasised this notion because we had quite a few problems on this
+subject and Lwt.
 
 In this case, the notion of availability requires the scheduler to be able to
 observe system events as often as possible. The problem is that Lwt doesn't
@@ -54,21 +57,26 @@ do so systematically. The only time you really give the scheduler the
 opportunity to see whether you can read or write is when you want to...
 read or write...
 
-More generally, it is said that Lwt's bind does not _yield_. In other words,
+More generally, it is said that Lwt's **bind** does not _yield_. In other words,
 you can chain any number of functions together (via the `>>=` operator), but
 from Lwt's point of view, there is no opportunity to see if an event has
 occurred. Lwt always tries to go as far down your chain as possible:
-- finish evaluating the promise
-- come across an operation that requires a system event (read or write)
+- and finish your promise
+- or come across an operation that requires a system event (read or write)
+- or come across an `Lwt.pause` (as a _yield_ point)
+
+Lwt is rather sparse in adding cooperation points besides `Lwt.pause` and
+read/write operations, in contrast with Async where the bind operator is a
+cooperation point.
 
 ### If there is no I/O, do not wrap in Lwt
 
-It was (bad) advice I was given. If a function doesn't do I/O, there's no point
-in putting it in Lwt. At first glance, however, the idea may be a good one. If
-you have a function that doesn't do I/O, whether it's in the Lwt monad or not
-won't make any difference to the way Lwt tries to execute it. Once again, Lwt
-should go as far as possible. So Lwt tries to solve both functions in the same
-way:
+It was (bad<sup>[1](#fn1)</sup>) advice I was given. If a function doesn't do
+I/O, there's no point in putting it in Lwt. At first glance, however, the idea
+may be a good one. If you have a function that doesn't do I/O, whether it's in
+the Lwt monad or not won't make any difference to the way Lwt tries to execute
+it. Once again, Lwt should go as far as possible. So Lwt tries to solve both
+functions in the same way:
 
 ```ocaml
 val merge : int array -> int array -> int array
@@ -98,10 +106,10 @@ If we trace the execution of the two functions (for example, by displaying our
 what is interesting in the Lwt code is the use of `both`, which suggests that
 the processes are running _at the same time_.
 
-"At the same time" does not necessarily suggest the use of several cores, but
-the possibility that the right-hand side may also have the opportunity to be
-executed even if the left-hand side has not finished. In other words, that the
-two processes can run **concurrently**.
+"At the same time" does not necessarily suggest the use of several cores or "in
+parallel", but the possibility that the right-hand side may also have the
+opportunity to be executed even if the left-hand side has not finished. In other
+words, that the two processes can run **concurrently**.
 
 But factually, this is not the case, because even if we had the possibility of
 a point of cooperation (with the `>|=` operator), Lwt tries to go as far as
@@ -129,6 +137,12 @@ sort1: [|5; 8|]
 sort1: [|9; 0; 6|]
 sort1: [|0; 6|]
 ```
+
+<hr>
+
+**<tag id="fn1">1</tag>**: However, if you are not interested in availability
+and would like the scheduler to try to resolve your promises as quickly as
+possible, this advice is clearly valid.
 
 #### Performances
 
@@ -184,8 +198,9 @@ opam-mirror unikernel. As you might expect, there is no MirageOS file system.
 So, in the case of opam-mirror, we use the ocaml-git memory implementation:
 `Git_mem`.
 
-`Git_mem` is different in that Git objects are simply stored in a `Hashtbl`. So
-let's return to our original advice:
+`Git_mem` is different in that Git objects are simply stored in a `Hashtbl`.
+There is no cooperation point when it comes to obtaining Git objects from this
+`Hashtbl`. So let's return to our original advice:
 
 > don't wrap code in Lwt if it doesn't do I/O.
 
