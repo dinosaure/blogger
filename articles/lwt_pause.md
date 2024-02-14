@@ -43,10 +43,10 @@ wait ~10 min before the service offered by the unikernel was available.
 
 ## Availability
 
-If you follow my articles, as far as Miou is concerned, from the outset I talk
-of the notion of availability if we were to make yet another new scheduler for
-OCaml 5. We emphasised this notion because we had quite a few problems on this
-subject and Lwt.
+If you follow my [articles][miou-articles], as far as Miou is concerned, from
+the outset I talk of the notion of availability if we were to make yet another
+new scheduler for OCaml 5. We emphasised this notion because we had quite a few
+problems on this subject and Lwt.
 
 In this case, the notion of availability requires the scheduler to be able to
 observe system events as often as possible. The problem is that Lwt doesn't
@@ -247,7 +247,7 @@ accesses to a `Hashtbl`.
 Thanks to [Hannes][hannes]' help, it took us an afternoon to work out where we
 needed to add cooperation points in `Git_mem` so that `analyse_pack` could give
 another service such as HTTP the opportunity to work. Basically, this series of
-commits shows where we needed to add `Lwt.pause`.
+[commits][commits] shows where we needed to add `Lwt.pause`.
 
 However, this points to a number of problems:
 1) it is not necessarily true that on the basis of composability alone (by
@@ -295,10 +295,12 @@ you to attend to talk more about Lwt, scheduler, Git and unikernels!
 [opam-mirror]: https://git.robur.coop/robur/opam-mirror
 [reproducibility]: https://blog.osau.re/articles/reproducible.html
 [bob]: https://bob.osau.re/
-[installation]: https://perdu.com
+[installation]: https://blog.osau.re/articles/reproducible.html
 [ocaml-git]: https://github.com/mirage/ocaml-git
 [ocaml-git-both]: https://github.com/mirage/ocaml-git/blob/a36c90404b149ab85f429439af8785bb1dde1bee/src/not-so-smart/smart_git.ml#L476-L481
 [hannes]: https://hannes.robur.coop/
 [armael]: https://cambium.inria.fr/~agueneau/
 [multipart_form]: https://discuss.ocaml.org/t/ann-release-of-multipart-form-0-2-0/7704#memory-bound-implementation
 [retreat]: https://retreat.mirage.io/
+[commits]: https://github.com/mirage/ocaml-git/pull/631/files
+[miou-articles]: https://blog.osau.re/tags/scheduler.html
