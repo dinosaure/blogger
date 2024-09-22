@@ -1,7 +1,7 @@
 ---
 date: 2022-06-02
-article.title: Spoke, how to implement a little cryptographic protocol
-article.description:
+title: Spoke, how to implement a little cryptographic protocol
+description:
   A simple how-to to understand how we implement protocols for MirageOS
 tags:
   - OCaml

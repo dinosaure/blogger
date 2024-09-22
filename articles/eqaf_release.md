@@ -1,7 +1,7 @@
 ---
 date: 2020-03-14
-article.title: Eq(af), timing attack!
-article.description:
+title: Eq(af), timing attack!
+description:
   A description of the new release of Eq{af}
 tags:
   - Security

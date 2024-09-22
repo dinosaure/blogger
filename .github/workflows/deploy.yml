@@ -1,22 +1,38 @@
-name: Build
+name: Deploy
 on:
   push:
     branches:
-      - main
-
+      - master
+  workflow_run:
+    workflows: ["Build"]
+    branches: [master]
+    types: 
+      - completed
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Build
         uses: ocaml/setup-ocaml@v2
         with:
-          ocaml-compiler: 4.14.x
+          ocaml-compiler: 5.2.0
           opam-depext-flags: --with-test
 
-      - run: opam pin add -y .
-      - run: opam install . --deps-only --with-doc --with-test
-      - run: opam exec -- dune exec src/blogger.exe -- build
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          echo "host *" > ~/.ssh/config
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+
+      - name: Deploy
+        run: |
+          opam pin add -y .
+          opam install . --deps-only --with-doc --with-test
+          opam exec -- dune build bin/push.exe
+          opam exec -- dune exec bin/push.exe -- -r git@github.com:dinosaure/blogger.git#gh-pages --host https://dinosaure.github.io/blogger

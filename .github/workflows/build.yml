@@ -1,0 +1,22 @@
+name: Build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: 5.2.0
+          opam-depext-flags: --with-test
+
+      - name: Build
+        run: |
+          opam pin add -y .
+          opam install . --deps-only --with-doc --with-test
+          opam exec -- dune build bin/push.exe
+          opam exec -- dune build bin/watch.exe
+

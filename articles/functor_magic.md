@@ -1,7 +1,7 @@
 ---
 date: 2020-02-17
-article.title: Functor, Application and magick!
-article.description:
+title: Functor, Application and magick!
+description:
   A little trick about *functor*
 tags:
   - OCaml

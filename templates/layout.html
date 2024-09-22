@@ -1,20 +1,3 @@
-{%- if metadata.title -%}
-{%- set dash = " - " -%}
-{%- set page_title = metadata.title -%}
-{%- elseif title -%}
-{%- set dash = " - " -%}
-{%- set page_title = title -%}
-{%- else -%}
-{%- set dash = "" -%}
-{%- set page_title = "" -%}
-{%- endif %}
-{% if metadata.description -%}
-{%- set page_description = metadata.description -%}
-{%- elseif description -%}
-{%- set page_description = description -%}
-{%- else -%}
-{%- set page_description = "blog.osau.re" -%}
-{%- endif -%}
 <!doctype html>
 <html lang="en">
   <head>
@@ -22,28 +5,32 @@
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>
-        Dinosaure's website{{ dash }}{{ page_title }}
+        Dinosaure's website{{ dash }}{{ title }}
     </title>
-    <meta name="description" content="{{ page_description }}">
-    <link type="text/css" rel="stylesheet" href="{{ root }}/css/hl.css">
-    <link type="text/css" rel="stylesheet" href="{{ root }}/css/style.css">
-    <script src="{{ root }}/js/hl.js"></script>
-    <link rel="alternate" type="application/rss+xml" href="{{ root }}/feed.xml" title="blog.osau.re">
+    <meta name="description" content="{{ description }}">
+    <link type="text/css" rel="stylesheet" href="{{ host }}/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="{{ host }}/css/style.css">
+    <script src="{{ host }}/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="{{ host }}/feed.xml" title="blog.osau.re">
   </head>
   <body>
     <header>
       <h1>blog.osau.re</h1>
       <blockquote>
-	<strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
       </blockquote>
     </header>
     <main>
         {%- autoescape false -%}
-        {{ body }}
+        {{ yocaml_body }}
         {% endautoescape -%}
     </main>
     <footer>
         <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
         <br />
     </footer>
     <script>hljs.highlightAll();</script>

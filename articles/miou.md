@@ -1,7 +1,7 @@
 ---
 date: 2023-09-08
-article.title: Miou, a simple scheduler for OCaml 5
-article.description:
+title: Miou, a simple scheduler for OCaml 5
+description:
   A description of the Miou scheduler
 tags:
   - OCaml

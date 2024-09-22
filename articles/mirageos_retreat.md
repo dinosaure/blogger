@@ -1,7 +1,7 @@
 ---
 date: 2023-05-05
-article.title: The MirageOS retreat (01/05/2023)
-article.description:
+title: The MirageOS retreat (01/05/2023)
+description:
   A little overview of this retreat
 tags:
   - OCaml

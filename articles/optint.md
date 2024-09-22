@@ -1,7 +1,7 @@
 ---
 date: 2022-04-12
-article.title: optint, 32-bits, 64-bits architecture and optimization
-article.description:
+title: optint, 32-bits, 64-bits architecture and optimization
+description:
   An introduction about optint, a little library to help you to support 32-bits
   architecture and 64-bits architecture
 tags:

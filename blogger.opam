@@ -5,7 +5,7 @@ maintainer: "romain.calascibetta@gmail.com"
 authors: [ "The XHTMLBoy <xhtmlboi@gmail.com>" ]
 
 build: [
-  [ "dune" "subst" ]
+  [ "dune" "subst" ] {pinned}
   [ "dune" "build" "-p" name "-j" jobs ]
   [ "dune" "runtest" "-p" name ] {with-test}
   [ "dune" "build" "@doc" "-p" name ] {with-doc}
@@ -27,17 +27,19 @@ depends: [
   "yocaml"
   "yocaml_unix"
   "yocaml_yaml"
-  "yocaml_cmark"
+  "yocaml_cmarkit"
   "yocaml_git"
   "yocaml_jingoo"
+  "yocaml_syndication"
 ]
 
 pin-depends: [
-  ["yocaml.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_unix.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_yaml.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_markdown.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_jingoo.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_git.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
-  ["yocaml_cmark.dev" "git+https://github.com/xhtmlboi/yocaml.git"]
+  ["yocaml.dev"             "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
+  ["yocaml_runtime.dev"     "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
+  ["yocaml_unix.dev"        "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
+  ["yocaml_yaml.dev"        "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
+  ["yocaml_cmarkit.dev"     "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
+  ["yocaml_git.dev"         "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
+  ["yocaml_jingoo.dev"      "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
+  ["yocaml_syndication.dev" "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
 ]

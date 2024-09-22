@@ -1,7 +1,7 @@
 ---
 date: 2022-04-21
-article.title: Pasteur is up!
-article.description:
+title: Pasteur is up!
+description:
   A description of pasteur with MirageOS 4
 tags:
   - OCaml

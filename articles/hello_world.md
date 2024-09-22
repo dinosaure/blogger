@@ -1,7 +1,7 @@
 ---
 date: 2020-02-06
-article.title: Hello World!
-article.description:
+title: Hello World!
+description:
   My first article which explains the goal of this blog
 tags:
   - OCaml

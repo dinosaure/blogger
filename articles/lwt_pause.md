@@ -1,7 +1,7 @@
 ---
 date: 2024-02-11
-article.title: Cooperation and Lwt.pause
-article.description:
+title: Cooperation and Lwt.pause
+description:
   A disgression about Lwt and Miou
 tags:
   - OCaml

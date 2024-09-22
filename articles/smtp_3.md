@@ -1,7 +1,7 @@
 ---
 date: 2023-01-03
-article.title: Deploy an SMTP service (3/3)
-article.description:
+title: Deploy an SMTP service (3/3)
+description:
   How to deploy a SMTP service to receive emails
 tags:
   - OCaml

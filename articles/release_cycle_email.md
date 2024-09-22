@@ -1,7 +1,7 @@
 ---
 date: 2020-03-31
-article.title: Release cycle about SMTP stack
-article.description:
+title: Release cycle about SMTP stack
+description:
   A description of the incoming SMTP stack.
 tags:
   - OCaml

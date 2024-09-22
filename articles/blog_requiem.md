@@ -1,7 +1,7 @@
 ---
 date: 2022-04-11
-article.title: Again, re-update of my blog after 2 years.
-article.description:
+title: Again, re-update of my blog after 2 years.
+description:
   A setting in abyme about this blog!
 tags:
   - OCaml

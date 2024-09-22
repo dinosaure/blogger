@@ -1,7 +1,7 @@
 ---
 date: 2022-11-14
-article.title: Reproducibility!
-article.description:
+title: Reproducibility!
+description:
   How we can manage reproducibility in OCaml
 tags:
   - OCaml

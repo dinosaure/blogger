@@ -1,7 +1,7 @@
 ---
 date: 2020-02-08
-article.title: MirageOS compilation
-article.description:
+title: MirageOS compilation
+description:
   A little explanation about the MirageOS compilation design
 tags:
   - OCaml
