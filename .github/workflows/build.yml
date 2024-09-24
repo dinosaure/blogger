@@ -1,4 +1,4 @@
-name: Build
+name: build
 on: [push, pull_request]
 jobs:
   build:
@@ -7,7 +7,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Build
+      - name: Set up OCaml
         uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: 5.2.0

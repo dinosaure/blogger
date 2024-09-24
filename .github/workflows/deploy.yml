@@ -1,10 +1,10 @@
-name: Deploy
+name: deploy
 on:
   push:
     branches:
       - master
   workflow_run:
-    workflows: ["Build"]
+    workflows: ["build"]
     branches: [master]
     types: 
       - completed
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Build
+      - name: Set up OCaml
         uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: 5.2.0
@@ -30,7 +30,7 @@ jobs:
           echo "host *" > ~/.ssh/config
           echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
-      - name: Deploy
+      - name: Build & Deploy
         run: |
           opam pin add -y .
           opam install . --deps-only --with-doc --with-test
