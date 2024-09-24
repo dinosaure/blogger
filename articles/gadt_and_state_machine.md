@@ -1,7 +1,7 @@
 ---
 date: 2022-07-22
-article.title: GADTs and state machine
-article.description:
+title: GADTs and state machine
+description:
   A little introduction about GADTs
 tags:
   - OCaml

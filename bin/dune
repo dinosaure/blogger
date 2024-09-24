@@ -1,0 +1,23 @@
+(executable
+ (name watch)
+ (libraries
+  yocaml
+  yocaml_syndication
+  yocaml_yaml
+  yocaml_jingoo
+  yocaml_cmarkit
+  yocaml_unix))
+
+(executable
+ (name push)
+ (libraries
+  fmt.tty
+  logs.fmt
+  git-unix
+  yocaml
+  yocaml_git
+  yocaml_syndication
+  yocaml_yaml
+  yocaml_jingoo
+  yocaml_cmarkit
+  yocaml_unix))

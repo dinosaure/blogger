@@ -1,7 +1,7 @@
 ---
 date: 2020-02-27
-article.title: Tuyau, the next conduit
-article.description:
+title: Tuyau, the next conduit
+description:
   An introduction about `tuyau` which wants to solve the Conduit's problem.  
 tags:
   - MirageOS

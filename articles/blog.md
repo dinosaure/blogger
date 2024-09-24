@@ -1,12 +1,12 @@
 ---
 date: 2020-08-24
-article.title: All the way down, my blog is re-up!
-article.description:
+title: All the way down, my blog is re-up!
+description:
   How the blog works?
 tags:
   - OCaml
   - MirageOS
-  - Blog
+  - blog
 ---
 
 My blog was down for a long time, something like 4 months and this article will

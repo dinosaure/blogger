@@ -1,7 +1,7 @@
 ---
 date: 2023-10-09
-article.title: Rules of Miou!
-article.description:
+title: Rules of Miou!
+description:
   A description of the Miou design and its rules
 tags:
   - OCaml

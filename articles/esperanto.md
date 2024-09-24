@@ -1,7 +1,7 @@
 ---
 date: 2022-05-05
-article.title: Esperanto, when OCaml meets Cosmopolitan
-article.description:
+title: Esperanto, when OCaml meets Cosmopolitan
+description:
   Build-once Run-anywhere
 tags:
   - OCaml

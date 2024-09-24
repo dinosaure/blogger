@@ -1,7 +1,7 @@
 ---
 date: 2022-12-06
-article.title: Deploy an SMTP service (1/3)
-article.description:
+title: Deploy an SMTP service (1/3)
+description:
   How to deploy your own SMTP service
 tags:
   - OCaml

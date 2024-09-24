@@ -1,6 +1,6 @@
 ---
-title: Index
-description: The famous root of the website
+title: my personal blog
+description: The Blog of dinosaure, OCaml & MirageOS developper
 ---
 
 Hello, I'm Romain Calascibetta, developer and member of the

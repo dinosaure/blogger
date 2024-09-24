@@ -1,6 +1,4 @@
-version = 0.24.1
-profile = janestreet
-break-infix = fit-or-vertical
-parse-docstrings = true
-module-item-spacing = compact
-margin = 78
+version=0.26.2
+break-separators=before
+break-collection-expressions=wrap
+exp-grouping=preserve
