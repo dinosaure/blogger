@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteGADTs and state machine
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>GADTs and state machine</h1>
+    <ul class="tags-list"><li>OCaml</li><li>Types</li><li>Protocol</li><li>GADTs</li></ul><p>If you follow my blog and my <a href="https://twitter.com/Dinoosaure">twitter</a> (or my <a href="https://mastodon.social/web/@dinosaure">mastodon</a>),
+you probably have my explanation about the implementation of a
+<a href="https://github.com/dinosaure/spoke">Spoke protocol</a> and the development of a new tool: <a href="https://github.com/dinosaure/bob">bob</a></p>
+<p>The latter is a tool for sharing files between users. The goal is to have
+software that can run everywhere thanks to <a href="https://github.com/dinosaure/esperanto">Esperanto</a>.</p>
+<p>But in this article, I'm going to talk more precisely about the implementation
+of the protocol already explained in my previous article on <a href="https://github.com/dinosaure/spoke">Spoke</a> but
+I introduces a new concept between peers, that of a relay. The objective
+is to implement 3 state machines ensuring the good completion of the famouse
+<em>handshake</em>. And to help me implement these machines, I decided to use GADTs
+(Generalized Algebraic Data Type).</p>
+<p>There are few articles to explain GADTs like the one from <a href="https://github.com/Drup">Drup</a> which
+introduces their use to implement <a href="https://drup.github.io/2016/08/02/difflists">a printf</a> (as implemented in OCaml)
+or the implementation of a simple <a href="https://discuss.ocaml.org/t/parsing-terms-into-a-well-typed-representation-a-gadt-puzzle/8688">lambda calculus</a> by <a href="https://github.com/gasche">Gasche</a>
+which I had already implemented to create a virtual machine of a typed
+lambda-calculus as <a href="https://github.com/mirage/mirage-lambda">a unikernel</a> for <a href="https://tweag.io/">Tweag.io</a>. More
+generally, <a href="https://www.cl.cam.ac.uk/teaching/1415/L28/gadts.pdf">Jérémie Yallop</a>'s course is just as good for learning and
+understanding GADTs.</p>
+<p>But, in my experiments (thanks especially to <a href="https://github.com/chambart">Pierre Chambart</a> for
+giving me the taste to do <a href="https://ocamlpro.com/blog/2017_04_01_ezsudoku">absurd</a> things with it), I always had the
+difficulty to really want to do something new and spontaneously use GADTs
+without falling into the printf/lambda-calculus cases.</p>
+<p>But I've always relied on a phrase from Drup: it's by trying to do absurd
+things with GADTs that you learn how to use them. This may not be the best
+advise as I really wasted time trying to prove some features (and realising
+that OCaml's type system was not powerful enough to translate Haskell or
+simple Coq examples into it) but I kept going and I can now say that I have
+a little experience with GADTs.</p>
+<p>In this and in Bob's case, GADTs came spontaneously as a possible solution to
+my state machine implementation. This article will explain why and finally
+show what can be a new use case for GADTs that is not so abstract.</p>
+<h2 id="introduction"><a class="anchor" aria-hidden="true" href="#introduction"></a>Introduction</h2>
+<p>The case that often comes up when explaining GADTs is ultimately the
+implementation of a <a href="https://perdu.com">DSL</a> that restricts you to no being able to construct
+values without respecting the type relationships you have described. For
+example, in a small, simple language such as:</p>
+<pre><code class="language-ocaml">type 'a ty =
+  | Bool : bool t
+  | Int : int t
+
+type 'a t =
+  | If_else : bool t * 'a t * 'a t -&gt; 'a t
+  | Val : 'a ty * 'a -&gt; 'a t
+  | Equal : 'a t * 'a -&gt; bool t
+  | Not : bool t -&gt; bool t
+</code></pre>
+<p>It is impossible for us to write this code:</p>
+<pre><code class="language-ocaml">let _ =
+  If_else (Equal (Val (Int, 0)) (Val (Bool, true)),
+    (Val (Int, 0)), (Val (Bool, true)))
+</code></pre>
+<p>GADTs introduce so-called existential types for which constraints can be
+described. In the <code>If_else</code> constructor, we constrain that the first element
+is of type <code>bool t</code>. Subsequently, a type relationship is described between
+the term if the test is true and the term if the test is false. This
+relationship exists because the same existential type <code>'a</code> is used in both
+values.</p>
+<p>Therefore we cannot write <code>If_then _ (Val (Int, 0)) (Val (Bool, true))</code> as the
+first value is of type <code>int t</code> while the second is of type <code>bool t</code>. And of
+course, in OCaml <code>int != bool</code>.</p>
+<p>However, for a pragmatic person like me, the use remains very limited. In the
+<code>printf</code> example, we could stop with these explanations since we would only be
+using this DSL in OCaml<sup><a href="#fn1">1</a></sup>. However, there are situations
+where what can build our values is not the OCaml developer (as with <code>printf</code>)
+but a user input.</p>
+<hr />
+<p><tag id="fn1"><strong>1</strong></tag>: I should mention, though, that OCaml has a &quot;magic&quot;
+phase that allow you to go from what appears to be a <code>string</code> to a GADT
+describing what to display. Indeed, for <code>printf &quot;%a&quot;</code>, OCaml parses <code>&quot;%a&quot;</code> into
+a GADT <strong>before</strong> compiling (and type-checking) the actual code.</p>
+<hr />
+<p>This may be the case for a lambda-calculus. Instead of describing its program
+in OCaml directly, we could write it to a file, parse the file, extract an AST
+in the form of an ADT and then transform it into a GADT:</p>
+<pre><code class="language-ocaml">type ast =
+  | If_else of ast * ast * ast
+  | Val of value
+  | Equal of ast * ast
+  | Not of ast
+
+type expr = Expr : 'a t * 'a ty -&gt; expr
+
+val parse : in_channel -&gt; ast
+val typ : ast -&gt; expr
+</code></pre>
+<p>The last step is ultimately the most difficult as it consists of &quot;proving&quot;
+situations where there is an equivalence between your ADT and your GADT. This
+is also implies that there are bound to be nonsense situations like our
+example above.</p>
+<p>Indeed, this is an example that can be written (and is syntactically valid:
+<code>if _ then 0 else true</code>) and that there is therefore an ADT corresponding to
+this term but which is still invalid from the point of view of the GADT.</p>
+<pre><code class="language-ocaml">let rec typ = function
+  | Val (Bool v) -&gt; Expr (Val (Bool, v), Bool)
+  | Val (Int v) -&gt; Expr (Val (Int, v), Int)
+  | If_else (t, a, b) -&gt; 
+    ( match typ t, typ a, typ b with
+    | Expr (t', Bool), Expr (a', ta), Expr (b', tb) -&gt;
+      Expr (If_else (t', a', b'), ta)
+      (* XXX(dinosaure): impossible to write because we did not prove that
+         [ta = tb] (and the case [ta = int] and [tb = bool]) still exists. *)
+    | _ -&gt; ... )
+</code></pre>
+<p>This is where you have to prove that <code>'ta = 'tb</code>. And that's where the
+aptly-named <code>refl</code> comes in:</p>
+<pre><code class="language-ocaml">type ('a, 'b) refl = Refl : ('a, 'a) refl
+</code></pre>
+<p>This constructor can only exist if there is an equivalence between <code>'a</code> and
+<code>'b</code>. In this sense, we can write:</p>
+<pre><code class="language-ocaml">let ty_equal
+  : type a b. a ty -&gt; b ty -&gt; (a, b) refl option
+  = fun a b -&gt; match a, b with
+    | Int, Int -&gt; Some Refl
+    | Bool, Bool -&gt; Some Refl
+    | _ -&gt; None
+</code></pre>
+<p>And we can finally prove that the first term of our <code>If_else</code> has the same type
+as our second term:</p>
+<pre><code class="language-ocaml">    ( match typ t, typ a, typ b with
+    | Expr (t', Bool), Expr (a', ta), Expr (b', tb) -&gt;
+      ( match ty_equal ta tb with
+      | Some Refl (* comes with 'ta = 'tb constraint *) -&gt;
+        Expr (If_else (t', a', b'), ta)
+      | None -&gt; (* typing error *) ) )
+</code></pre>
+<p>This little introduction shows an essential point in understanding GADTs: they
+do not &quot;magically&quot; remove impossible cases, GADTs force us not to be able to
+construct absurd values according to our rules but delegates the handling of
+errors (like our type error above) upstream (when we switch between ADT and
+GADT).</p>
+<p>GADTs become interesting when it comes to &quot;evaluating&quot;/introspecting a value
+constructed with them. In this situation, since we will have already cleaned
+up all the nonsense cases (with the help of the compiler), only the situation
+that make sense (in the terms of our constraints) can be deconstructed and
+manipulated:</p>
+<pre><code class="language-ocaml">let rec eval : type a. a t -&gt; a = function
+  | If_else (test, a, b) -&gt;
+    if eval test
+    then eval a else eval b
+    (* We already sure that they return the same type. *)
+  | Val (_, v) -&gt; v
+  | Equal (a, b) -&gt; eval a = eval b
+  | Not t -&gt; not (eval t)
+</code></pre>
+<h2 id="protocol--duality"><a class="anchor" aria-hidden="true" href="#protocol--duality"></a>Protocol &amp; Duality</h2>
+<p>The use of GADTs is based on constraints that are true the way through when you
+want to look at what they represent. In this sense, it is always difficult to
+pull a use of GADTs out of a hat without first considering our use in its
+entirety.</p>
+<p>And yet, in some situations, we know that there are absolute rules within which
+we are sure never to overstep. The central question remains: are our impossible
+cases worth a GADT?</p>
+<p>A few <code>assert false</code> here and there without being able to deduce a fundamental
+rule means that the use of GADTs can become a pain that often leads to nothing.
+However. there are times when we can recognise fundamental rules such as the
+equivalence of types in our lambda-calculus.</p>
+<p>In the case of protocol implementation, the fundamental rule is called duality
+between server and client: if the client <strong>sends</strong> a packet, the server
+<strong>receives</strong> a packet &amp; if the server <strong>sends</strong> a packet, the client
+<strong>receives</strong> a packet.</p>
+<pre><code class="language-ocaml">type ('a, 'r) send = Send
+type ('a, 'r) recv = Recv
+type close = Close
+
+type ('c, 's) dual =
+  | Server_to_client : ('c, 's) dual -&gt; (('a, 'c) recv, ('a, 's) send) dual
+  | Client_to_server : ('c, 's) dual -&gt; (('a, 'c) send, ('a, 's) recv) dual
+  | Close : (close, close) dual
+</code></pre>
+<p>But back to <code>bob</code>. This form of duality exists even if it is less abstract -
+but sufficient for our purposes.</p>
+<h3 id="the-relay"><a class="anchor" aria-hidden="true" href="#the-relay"></a>The relay</h3>
+<p>To stabilise the connection between two peers during a file transfer, we have
+opted to implement a <em>relay</em> between peers. Of course, and this is the most
+important point, the relay would be &quot;blind&quot; during the direct transmission
+from one peer to another, our handshake.</p>
+<p>Nevertheless, the relay acts as an arbiter on certain points such as the
+identity of these peers. Indeed, it is not up to the peers to define their
+identities (which is part of the handshake) but to the relay to do so.</p>
+<p>If we go back to our described protocol, we define 2 roles during the handshake
+and even more so, during the exchange of a file: we have a sender and a
+receiver. There are finally 3 roles in our protocol: the relay, a peer wanting
+to send a file, a peer wanting to receive a file.</p>
+<p>From these 3 roles, we can deduce some obvious but fundamental rules
+concerning our protocol:</p>
+<ul>
+<li>a relay can talk to a sender or receiver but cannot talk to another relay</li>
+<li>a sender can talk to a receiver or the relay but cannot talk to another
+sender</li>
+<li>a receiver can talk to a sender or the relay but cannot talk to another
+receiver</li>
+</ul>
+<hr />
+<p>If you have understood this little explanation, we find the principle of
+duality. It is not established in the form of sending/receiving according to
+the role of server/client (like the example above) but rather in the form
+of who should talk to whom. We are still talking about duality because
+knowing the target of &quot;a packet&quot; implies knowing its source: it is because
+I know that the packet comes from a sender that its destination is either the
+relay or a receiver - and vice versa.</p>
+<p>These rules become particularly interesting for the relay which can receive
+and send packets to senders and receivers. Of course, it knows the identity
+and role of each - and it is at this point that it should be impossible for us
+to retransmit (and thus reconstruct) a packet from one sender to another sender
+as the relay.</p>
+<h2 id="the-bob-protocol"><a class="anchor" aria-hidden="true" href="#the-bob-protocol"></a>The Bob Protocol</h2>
+<p>We'll just give a quick reminder of the protocol that has been extended. An
+introduction of the peers to the relay is required so that the peers define
+their roles (sender or receiver) and the relay passes on their identity.</p>
+<p>As for the sender, in addition to defining itself as a sender to the relay, it
+transmits the salt corresponding to the first packet to be exchanged during our
+handshake. The relay will then notify all available receivers of the existence
+of the new senders with their respective salts.</p>
+<p>Finally, a real communication between receivers and senders is initiated with
+the exchange of X, Y, identities and validators.</p>
+<p>The &quot;Agreement&quot; packet signals the end of our handshake, the sender and the
+receiver have agreed on their identities and passwords. Nevertheless, we
+decided to extend the protocol by a human action of the receiver who accepts
+or refuses such an agreement.</p>
+<p>Here is a condensed version of this explanation:</p>
+<pre><code class="language-shell">  sender === Hello_as_sender ==&gt; relay
+  sender &lt;== Sender_identity === relay
+
+  recver === Hello_as_recver ==&gt; relay
+  recver &lt;== Recver_identity === relay
+
+  relay  ==== New_sender             ===&gt; receiver
+  sender &lt;=== X_and_recver_identity  ==== receiver
+  sender ==== Y_and_sender_validator ===&gt; receiver
+  sender &lt;=== Recv_validator         ==== receiver
+  sender ==== Agreement              ===&gt; receiver
+  sender &lt;=== Accepted               ==== receiver
+            | Or Refused
+  relay  ==== Done                   ===&gt; receiver
+</code></pre>
+<p>In concrete terms, each packet has its real destination listed. In fact, in
+reality, all packets will go to the relay and it is up to the relay to
+&quot;dispatch&quot; the packets to the right destination. A unique ID is therefore
+associated with each receiver and sender. The unique ID <code>0000</code> concerns the
+relay. This is how receivers and senders can communicate directly via the
+relay.</p>
+<p>This last type of transmission (which, after all, concerns almost all our
+handshake) should only be the responsibility of the peers. That is, when
+transmitting a packet from one peer to another, the relay should not
+introspect/modify said packet and just retransmit it as long as our previous
+rules, i.e a sender can only talk to a receiver and vice-versa, are respected.</p>
+<h2 id="the-gadt"><a class="anchor" aria-hidden="true" href="#the-gadt"></a>The GADT</h2>
+<p>From all these explanations, we can begin to define our GADTs. What is most
+important for us here is to encode the roles and define our packets with the
+emitter role and the receiver role.</p>
+<pre><code class="language-ocaml">type sender = |
+type recver = |
+type relay  = |
+
+type ('from, 'to) packet =
+  | Hello_as_a_sender : (sender, relay) packet
+  | Sender_identity   : (relay, sender) packet
+  | Hello_as_a_recver : (recver, relay) packet
+  | Recver_identity   : (relay, recver) packet
+
+  | New_sender             : (relay,  recver) packet
+  | X_and_recver_identity  : (recver, sender) packet
+  | Y_and_sender_validator : (sender, recver) packet
+  | Recv_validator         : (recver, sender) packet
+  | Agreement              : (sender, recver) packet
+  | Accepted               : (recver, sender) packet
+  | Refused                : (recver, sender) packet
+</code></pre>
+<p>We will finally encode the principle of duality in these termes: being a
+receiver, my opposite/dual is a sender and vice-versa. So we will have a type
+such as: <code>type ('role, 'non_role) peer</code>.</p>
+<pre><code class="language-ocaml">type ('role, 'non_role) peer =
+  | Sender : (sender, recver) peer
+  | Recver : (recver, sender) peer
+</code></pre>
+<p>Finally, as we have explained, a packet also contains its destination from
+which we can deduce the role of the receiver and the same applies to the role
+of the sender. The relay, on the other hand, has both knowledge of the sender
+and the receiver of the packet. We are therefore going to encode, still with
+GADTs, a means of recognising the role of the source or the recipient of a
+packet - if the role is a receiver/sender, we will associate its unique ID as
+an <code>int</code>:</p>
+<pre><code class="language-ocaml">type ('from, 'to) src =
+  | Relay : (relay, 'to) src
+  | Peer : ('from, 'non_from) peer * int -&gt; ('from, 'non_from) src
+
+type ('from, 'to) dst =
+  | Relay : ('from, relay) dst
+  | Peer : ('to, 'non_to) peer * int -&gt; ('non_to, 'to) dst
+</code></pre>
+<p>Finally, we &quot;wrap&quot; our types together where we describe our type relationships
+well. For now, we'll focus on what our peers handle, namely, packets from a
+certain source (depending on the peer's role) and the sending of packets to
+a particular destination (the <code>'non_role</code> or the relay):</p>
+<pre><code class="language-ocaml">type src_rel =
+  | Sender_packet : ('from, sender) src * ('from, sender) packet -&gt; src_rel
+  | Recver_packet : ('from, recver) src * ('from, recver) packet -&gt; src_rel
+
+type 'from send =
+  | Send_to : ('from, 'to) dst * ('from, 'to) packet -&gt; 'from send
+</code></pre>
+<h2 id="the-state-machine"><a class="anchor" aria-hidden="true" href="#the-state-machine"></a>The state machine</h2>
+<p>The implementation of a state machine for our purposes is very simple. It
+consists of 2 functions that handles incoming packets and a second function
+that returns packets that should be sent. These two functions share the same
+state, which makes it possible to execute functions concurrently. The
+function handling the packets will be the one that will tell us if the
+handshake is finished or not.</p>
+<pre><code class="language-ocaml">module Recver : sig
+  type state
+
+  val process_packet
+    : type from. state -&gt; (from, recver) src -&gt; (from, recver) packet -&gt;
+      [ `Continue | `Done | `Close ]
+  val next_packet : state -&gt; recver send option
+end
+
+module Sender : sig
+  type state
+
+  val process_packet
+    : type from. state -&gt; (from, sender) src -&gt; (from, sender) packet -&gt;
+      [ `Continue | `Done | `Close ]
+  val next_packet : state -&gt; sender send option
+end
+</code></pre>
+<p>At this stage, there is still no mention of scheduling or I/O. We are only
+interested in what the reception of packets means for our state and whether we
+should send new packets.</p>
+<p>A specialisation of roles in the types can be seen. This specialisation seems
+fair, as <code>process_packet</code> should only handle packets destined for the role it
+is given (<code>recver</code> or <code>sender</code>). The <code>next_packet</code> should only be able to emit
+packets whose origin is of course related to its role.</p>
+<p>More concretely, it allows:</p>
+<ol>
+<li>to have an exhaustive pattern-matching in <code>process_packet</code> corresponding to
+its role</li>
+<li>to be able to build and send packages only if our role allows it</li>
+</ol>
+<h3 id="the-sender-state-machine"><a class="anchor" aria-hidden="true" href="#the-sender-state-machine"></a>The sender state machine</h3>
+<p>Thanks to our constraints, the implementation of the machines will be
+spontaneous in the sense that the pattern-matching will only take care of what
+is valid - but let's not forget that, necessarily, a step exists before to
+remove the absurd cases! In this, we can really concentrate on the
+implementation of our state machine and so we will start with the sender:</p>
+<pre><code class="language-ocaml">let send_to
+  : type from to. (from, to) dst -&gt; (from, to) packet -&gt; from send Queue.t -&gt; unit
+  = fun dst packet queue -&gt; Queue.push (Send_to (dst, packet)) queue
+
+let to_sender
+  : uid:int -&gt; (recver, sender) dst
+  = fun ~uid -&gt; Peer (Sender, uid)
+let to_recver
+  : uid:int -&gt; (sender, recver) dst
+  = fun ~uid -&gt; Peer (Recver, uid)
+let to_relay : (_, relay) dst = Relay
+
+type state =
+  { secret           : Spoke.secret
+  ; mutable identity : string
+  ; recvers          : (int, Spoke.server * string) Hashtbl.t
+  ; queue            : sender send Queue.t
+  ; mutable sk       : Spoke.shared_keys option }
+
+let make ~secret =
+  let t = { secret
+          ; identity= &quot;&quot;
+          ; recver= Hashtbl.create 0x10
+          ; sk= None
+          ; queue= Queue.create () } in
+  let public = Spoke.public_of_secret secret in
+  send_to to_relay (Hello_as_a_sender { public }) t.queue ;
+  t
+
+let process_packet
+  : type from. state -&gt; (from, sender) src -&gt; (from, sender) packet -&gt;
+    [ `Continue | `Done | `Close ]
+  = fun state source packet -&gt; match source, packet with
+  | Relay, Sender_identity identity -&gt;
+    state.identity &lt;- identity ; `Continue
+  | Peer (Recver, uid), X_and_recver_identity { _X; recver_identity; } -&gt;
+    ( match Spoke.server_compute ~secret:state.secret
+        ~identity:(recver_identity, state.identity) _X with
+    | Ok (server, (_Y, sender_validator)) -&gt;
+      Hashtbl.add t.recvers uid (server, recver_identity) ;
+      let packet = Y_and_sender_validator { _Y; sender_validator; } in
+      send_to (to_recver ~uid) packet state.queue;
+      `Continue
+    | Error _ -&gt; `Continue )
+  | Peer (Recver, uid), Recv_validator recv_validator -&gt;
+    ( match Hashtbl.find_opt t.recvers uid with
+    | None -&gt; `Continue
+    | Some (server, _) -&gt;
+      match Spoke.server_finalize ~server recv_validator with
+      | Ok sk -&gt;
+        state.sk &lt;- Some sk ;
+        send_to (to_recver ~uid) Agreement state.queue ;
+        `Continue
+      | Error _ -&gt; `Continue )
+  | Peer (Recver, uid), Accepted -&gt;
+    ( match state.sk with
+    | Some sk -&gt; `Done
+    | None -&gt; `Continue )
+  | Peer (Recver, uid), Refused -&gt;
+    state.sk &lt;- None ;
+    Hashtbl.remove t.recver uid ;
+    `Continue
+
+let next_packet state = Queue.take_opt state.queue
+</code></pre>
+<p>As we can see, the pattern-matching is quite exhaustive in case our role is
+that of the sender. We can only handle packets destined for the sender <strong>and</strong>
+we can only build (and then send) packets that only the sender can send - a
+<code>send_to _ Hello_as_recver</code> would end in a type error.</p>
+<h3 id="the-receiver-state-machine"><a class="anchor" aria-hidden="true" href="#the-receiver-state-machine"></a>The receiver state machine</h3>
+<p>Of course, the same can be done for the receiver by specialising the types with
+our other role. We could even just compile our code and follow the compiler's
+complaints to help us handle the valid cases one by one:</p>
+<pre><code class="language-ocaml">type state =
+  { password : string
+  ; mutable identity : string
+  ; senders : (int, Spoke.client * string) Hashtbl.t
+  ; mutable sk : Spoke.shared_keys option
+  ; queue : recver send Queue.t
+  ; choose : string -&gt; bool }
+
+let make ~choose ~password =
+  let t = { password
+          ; identity= &quot;&quot;
+          ; senders= Hashtbl.create 0x10
+          ; sk= None
+          ; queue= Queue.create ()
+          ; choose } in
+  send_to to_relay Hello_as_a_recver t.queue ;
+  t
+
+let process_packet
+  : type from. state -&gt; (from, recver) src -&gt; (from, recver) packet -&gt;
+    [ `Continue | `Done | `Close ]
+  = fun state source packet -&gt; match source, packet with
+  | Relay, Recver_identity identity -&gt;
+    state.identity &lt;- identity ; `Continue
+  | Relay, New_server { uid; public; sender_identity; } -&gt;
+    ( match Spoke.hello ~public state.password with
+    | Ok (client, _X) -&gt;
+      Hashtbl.add t.senders uid (client, sender_identity) ;
+      let packet = X_and_recver_identity { _X; recver_identity= state.identity; } in
+      send_to (to_sender ~uid) packet t.queue ;
+      `Continue
+    | _ -&gt; `Continue )
+  | Peer (Sender, uid), Y_and_sender_validator { _Y; sender_validator; } -&gt;
+    ( match Hashtbl.find_opt t.senders uid with
+    | None -&gt; `Continue
+    | Some (recver, sender_identity) -&gt;
+      match Spoke.client_compute ~client
+        ~identity:(t.identity, sender_identity) _Y with
+      | Ok (sk, recv_validator) -&gt;
+        t.sk &lt;- Some sk ;
+        let packet = Recv_validator recv_validator in
+        send_to (to_sender ~uid) packet t.queue ;
+        `Continue
+      | Error _ -&gt; `Continue )
+  | Peer (Sender, uid), Agreement -&gt;
+    ( match t.sk with
+    | None -&gt; `Continue
+    | Some sk -&gt;
+      let _, sender_identity = Hashtbl.find t.senders uid in
+      match choose sender_identity with
+      | true  -&gt; send_to (to_sender ~uid) Accepted t.queue ; `Continue
+      | false -&gt;
+        t.sk &lt;- None ;
+        Hashtbl.remove t.senders uid ;
+        send_to (to_sender ~uid) Refused t.queue ; `Continue )
+  | Relay, Done -&gt;
+    ( match t.sk with
+    | Some sk -&gt; `Done
+    | None -&gt; `Continue )
+
+let next_packet state = Queue.take_opt state.queue
+</code></pre>
+<p>Et voilà! As you can see, once again, you just have to follow the rules we have
+described - in other words, trust your compiler and follow its advice!</p>
+<h3 id="an-impure-world"><a class="anchor" aria-hidden="true" href="#an-impure-world"></a>An impure world</h3>
+<p>However, we still miss the step where we have to build our GADTs from a type in
+which these constraints do not exist (yet!). As with our lambda-calculus, this
+ADT is equivalent (without the constraints) to our <code>packet</code> GADT.</p>
+<p>To make our lives easier, we will directly use a polymorphic variant.</p>
+<p>The objective here is to try to create a <code>src_rel</code> value containing our famous
+relationships. Let's not forget 3 details:</p>
+<ul>
+<li>we know what role we have</li>
+<li>since we know our role, we can deduce the role of the packet sender (the
+dual/opposite of our role)</li>
+<li>a special case exists for the relay whose unique ID is <code>0000</code></li>
+</ul>
+<pre><code class="language-ocaml">let src_and_packet uid packet = match uid, packet with
+  | 00, `Sender_identity sender_identity -&gt;
+    Sender_packet (Relay, Sender_identity sender_identity)
+  | 00, `Recver_identity recver_identity -&gt;
+    Recver_packet (Relay, Recver_identity recver_identity)
+  | 00, `New_server (uid, public, sender_identity) -&gt;
+    Recver_packet (Relay, New_server { uid; public; sender_identity; })
+  | 00, `Done -&gt;
+    Recver_packet (Relay, Done)
+  | uid, `X_and_recver_identity (_X, recver_identity) -&gt;
+    Sender_packet (Peer (Recver, uid), X_and_recver_identity { _X; recver_identity; })
+  | uid, `Y_and_sender_validator (_Y, sender_validator) -&gt;
+    Recver_packet (Peer (Sender, uid), Y_and_sender_validator { _Y; sender_validatorl })
+  | uid, `Recv_validator recv_validator -&gt;
+    Sender_packet (Peer (Recver, uid), Recv_validator recv_validator)
+  | uid, `Agreement -&gt;
+    Recver_packet (Peer (Sender, uid), Agreement)
+  | uid, `Accepted -&gt;
+    Recver_packet (Peer (Recver, uid), Accepted)
+  | uid, `Refused -&gt;
+    Recver_packet (Peer (Recver, uid), Refused)
+  | _ -&gt; failwith &quot;Invalid packet&quot;
+
+let recver_process_packet state uid packet =
+  match src_and_packet uid packet with
+  | Recver_packet (src, packet) -&gt;
+    Recver.process_packet state src packet
+  | _ -&gt; failwith &quot;Roles mismatches between receiver and packet&quot;
+
+let sender_process_packet state uid packet =
+  match src_and_packet uid packet with
+  | Sender_packer (src, packet) -&gt;
+    Sender.process_packet state src packet
+  | _ -&gt; failwith &quot;Roles mismatches between sender and packet&quot;
+</code></pre>
+<p>As can be seen, the &quot;mapping&quot; remains quite simple and the absurd cases are
+still quite obvious. At this stage, as far as the peer state machines are
+concerned, we have done the hardest work. All that remains is to implement a
+new layer that deals with parsing a stream of bytes into packets - but we
+won't explain that here.</p>
+<h2 id="the-state-machine-of-the-relay"><a class="anchor" aria-hidden="true" href="#the-state-machine-of-the-relay"></a>The state machine of the relay</h2>
+<p>However, there is still the implementation of the relay. The latter actually
+has 4 goals:</p>
+<ul>
+<li>it is the authority that issues and assigns unique identities to our peers</li>
+<li>it is the one that informs the receivers of the arrival of new senders (see
+<code>New_server</code> packet)</li>
+<li>it forwards packets from peer to peer according to the unique IDs written in
+the packets - without observing/deconstructing/introspecting the contents
+of these packets</li>
+<li>finally, it is the one that closes (with the <code>Done</code> packet) the handshake</li>
+</ul>
+<p>The last is important since the final goal of the relay is to allocate a secure
+room to allow communication between peers with their shared keys. This means
+that the relay will still introspect 2 packets: <code>Accepted</code> &amp; <code>Refused</code>. And it
+is indeed the reception of the first one retransmitted to the sender that the
+relay confirms the agreement by sending back to the receiver the <code>Done</code> packet.</p>
+<p>Finally, the relay has a different modus operandi than the peers. It does not
+only send or receive packets, it also retransmits them. Its behavior depends
+not only on the source <code>('from, 'to) src</code> of the packet (as for our peers) but
+also on its destination <code>('from, 'to) dst</code>. So we have a new type that will
+link the type parameters of <code>('from, 'to) src</code> and <code>('from, 'to) dst</code>:</p>
+<pre><code class="language-ocaml">type ('from, 'non_from, 'to) transmit =
+  | Blind : ('from, 'to, 'to) transmit
+  | From_recver : (recver, sender, relay) transmit
+  | From_sender : (sender, recver, relay) transmit
+</code></pre>
+<p>Here, 3 cases are described:</p>
+<ul>
+<li>the case of retransmitting a packet from one peer to another. Note that, of
+course, you want to retransmit to the dual/opposite of <code>'from</code></li>
+<li>the case where the receiver wants to send a packet to the relay. The
+dual/opposite of the receiver must be specified even if the destination of
+the packet is the relay</li>
+<li>finally the case where the sender wants to send a packet to the relay</li>
+</ul>
+<p>Finally, we need to separate the case where we want to send a packet to a peer
+in the role of the relay (as for <code>{Sender,Recver}_identity</code> packets) or in the
+role of the source of the packet when it comes relaying:</p>
+<pre><code class="language-ocaml">type 'from send_relay =
+  | Respond : (_, 'to) dst * (relay, 'to) packet -&gt; relay send_relay
+  | Transmit : ('from, 'to) src * ('from, 'to) dst * ('from, 'to) packet -&gt; relay send_relay
+</code></pre>
+<p>With all this, we can implement our <code>process_packet</code> function for the relay:</p>
+<pre><code class="language-ocaml">let respond dst packet queue = Queue.push (Respond (dst, packet)) queue
+let transmit ~src ~dst packet queue = Queue.push (Transmit (src, dst, packet)) queue
+
+let process_packet
+  : type x y z.
+    src_identity:string -&gt;
+    state -&gt; (x, y) src -&gt; (x, y, z) transmit -&gt; (y, z) dst -&gt; (y, z) packet -&gt;
+    [ `Continue | `Agreement ]
+  = fun ~src_identity state src link dst packet -&gt;
+    match src, link, dst, packet with
+    | Peer (Recver, uid), From_recver, Relay, Hello_as_a_recver -&gt;
+      respond (to_recver ~uid) (Recver_identity src_identity) t.queue ;
+      Hashtbl.iter begin fun sender_uid (sender_identity, public) -&gt;
+      let packet = New_sender { uid= sender_uid; public; sender_identity; } in
+      respond (to_recver ~uid) packet t.queue end t.senders ;
+      `Continue
+    | Peer (Sender, uid), From_sender, Relay, Hello_as_a_sender { public } -&gt;
+      respond (to_sender ~uid) (Sender_identity src_identity) t.queue ;
+      Hashtbl.iter begin fun client_uid client_identity -&gt;
+      let packet = New_sender { uid; public; sender_identity= src_identity; } in
+      respond (to_recver ~uid:recver_uid) packet t.queue end t.clients ;
+      `Continue
+    | Peer (Recver, from_uid), Blind
+      Peer (Sender, to_uid), Accepted -&gt;
+      send_to (to_recver ~uid:from_uid) Done state.queue ;
+      transmit ~src ~dst packet state.queue ;
+      `Agreement
+    | Peer (Recver, from_uid), Blind
+      Peer (Sender, to_uid), Refused -&gt;
+      remove_candidates ~src ~dst state ;
+      transmit ~src ~dst packet state.queue ;
+      `Continue
+    | src, Blind, dst, packet -&gt;
+      transmit ~src ~dst packet t.queue ;
+      `Continue
+
+let send_packet state = Queue.take_opt state.queue
+</code></pre>
+<p>We can see our 4 goals given above with regard to our relay. The assignment of
+identities (<code>src_identity</code> should come from <code>Unix.getpeername</code>) as well as the
+<em>broadcast</em> of available senders. We also see the retransmission in the <code>Blind</code>
+case as well as the introspection of <code>Accepted</code>/<code>Refused</code> to know if we should
+send <code>Done</code> or not.</p>
+<p>What this implementation shows that I think is very imporant is the <code>Blind</code>
+case, which shows that the relay should not collect information that might
+infringe on the privacy of the peers - of course, even if a relay could
+collect this information, it would not, a priori, be able to infer the password
+shared between the peers (since the latter is never transmited into the pipe).</p>
+<p>More generally, the use of GADTs in relation to our relay provides more
+informations about the relationships between <code>src</code>, <code>dst</code> and <code>packet</code>. In this
+way, we don't have to check anything more than what we are given in the <code>Blind</code>
+case - namely, that <code>src</code> is the dual/opposite of <code>dst</code> and that the <code>packet</code>
+type parameters match <code>src</code>/<code>'from</code> and <code>dst</code>/<code>'to</code>.</p>
+<p>We fall back into the situation of the <code>eval</code> for our lambda-calculus where
+the value of our <code>If_else</code>, although abstract, do have the same type and so we
+can write this without type error:</p>
+<pre><code class="language-ocaml">let rec eval : type a. a t -&gt; a = function
+  | If_else (test, a, b) -&gt;
+    if eval test
+    then eval a else eval b
+    (* We already sure that they return the same type. *)
+  | _ -&gt; ...
+</code></pre>
+<h3 id="plug-the-world"><a class="anchor" aria-hidden="true" href="#plug-the-world"></a>Plug the world!</h3>
+<p>Again, we need a function that turns a packet with no type relationshops into a
+value with our type relationships in the same way as <code>src_rel</code>. Indeed, we
+need to create a new type <code>dst_rel</code>. Remember that the relay receives packets
+whose destination is listed.</p>
+<p>Finally, the relay also has the ability to recognise the source of the packet
+and more importantly the role of that source! So we have to create our type
+relations in two phases:</p>
+<ol>
+<li>a first one which consists in defining the relations between the packet
+and the type <code>dst</code></li>
+<li>a second phase which consists in inferring <code>src</code></li>
+</ol>
+<pre><code class="language-ocaml">type dst_rel =
+  | Relay_packet : ('a, 'b) dst * ('a, 'b) packet -&gt; dst_rel
+
+type exists =
+  | Exists : ('f, 't) peer * ('f, 't) src -&gt; exists
+  | None : exists
+</code></pre>
+<p>It is through these types that we can create the type relationships necessary
+for <code>process_packet</code> (see <code>x</code>, <code>y</code> and <code>z</code>).</p>
+<pre><code class="language-ocaml">let dst_and_packet uid packet = match uid, packet with
+  | 00, `Hello_as_a_sender public -&gt;
+    Relay_packet (Relay, Hello_as_a_sender { public })
+  | 00, `Hello_as_a_recver -&gt;
+    Relay_packet (Relay, Hello_as_a_client)
+  | uid, `Recver_validator validator -&gt;
+    Relay_packet (Peer (Sender, uid), Recver_validator validator)
+  | uid, `Y_and_sender_validator (_Y, sender_validator) -&gt;
+    Relay_packet (Peer (Recver, uid), Y_and_sender_validator { _Y; sender_validator; })
+  | uid, `X_and_recver_identity (_X, recver_identity) -&gt;
+    Relay_packet (Peer (Sender, uid), X_and_recver_identity { _X; recver_identity; })
+  | uid, `Agreement -&gt;
+    Relay_packet (Peer (Recver, uid), Agreement)
+  | uid, `Accepted -&gt;
+    Relay_packet (Peer (Sender, uid), Accepted)
+  | uid, `Refused -&gt;
+    Relay_packet (Peer (Sender, uid), Refused)
+  | _ -&gt; failwith &quot;Invalid packet&quot;
+
+let process_packet
+  : type from to.
+    state -&gt; src_identity:string -&gt; (from, to) dst -&gt; (from, to) packet -&gt;
+    [ `Continue | `Agreement ]
+  = fun state ~src_identity dst packet -&gt;
+    let src = match Hashtbl.find_opt state.uids src_identity with
+      | Some (`Recver uid) -&gt; Exists (Recver, Peer (Recver, uid))
+      | Some (`Sender uid) -&gt; Exists (Sender, Peer (Sender, uid))
+      | None -&gt; None in
+    match src, dst, packet with
+    | Exists (Recver, src), (Peer (Sender, _) as dst), packet -&gt;
+      process_packet state ~src_identity src Blind dst packet
+    | Exists (Sender, src), (Peer (Recver, _) as dst), packet -&gt;
+      process_packet state ~src_identity src Blind dst packet
+    | None, Relay, Hello_as_a_recver -&gt;
+      let uid = gen () in
+      let src : _ src = Peer (Recver, uid) in
+      Hashtbl.replace state.uids src_identity (`Recver uid) ;
+      process_packet state ~src_identity src From_recver dst Hello_as_a_client
+    | None, Relay, (Hello_as_a_sender _ as packet) -&gt;
+      let uid = gen () in
+      let src : _ src = Peer (Sender, uid) in
+      Hashtbl.replace state.uids src_identity (`Sender uid) ;
+      process_packet state ~src_identity src From_sender dst packet
+    | _ -&gt; failwith &quot;Invalid packet&quot;
+
+let process_packet ~src_identity state uid packet =
+  let Relay_packet (dst, packet) = dst_and_packet uid packet in
+  process_packet state ~src_identity dst packet
+</code></pre>
+<p>Et voilà! We have our 3 state machines for our peers (sender and receiver) as
+well as for our relay! The duality rule introduced from the beginning is
+general enough not to prevent the extension of the protocol.</p>
+<p>There are however several points to clarify. It may happen that the OCaml
+compiler cannot really prove the completeness of our pattern-matching. This is
+partly due to &quot;nested&quot; constructors - the compiler has to look at the values of
+some of our GADTs to prove some impossible cases. For our last machine, we can
+talk about this case:</p>
+<pre><code class="language-ocaml">    match src, dst, packet with
+    | Exists (_, Relay), _, _ -&gt; .
+</code></pre>
+<p>As you can see, we can define the branch and use the <code>.</code> to disprove the case.
+The case is not possible because the <code>Relay</code> constructor constraints some
+existential types as <code>(relay, 'to) src</code> and our <code>peer</code> type never defines
+a constructor with the role <code>relay</code> (it defines only two roles
+<code>Sender</code>/<code>sender</code> &amp; <code>Recver</code>/<code>recver</code>) and we explicitely defined a type
+relationship between <code>'from</code> from <code>src</code> and <code>'from</code> from <code>peer</code>.</p>
+<pre><code class="language-ocaml">type ('role, 'non_role) peer =
+  | Sender : (sender, recver) peer
+  | Recver : (recver, sender) peer
+
+type ('from, 'to) src =
+  | Relay : (relay, 'to) src
+  | Peer : ('from, 'non_from) peer * int -&gt; ('from, 'non_from) src
+
+type exists =
+  | Exists : ('from, 'to) peer * ('from, 'to) src -&gt; exists
+</code></pre>
+<p>Another point concerns the protocol itself which, in practice, contains a few
+more packets than we have just seen. We can mention in particular the
+<code>Timeout</code> packet or the <code>Spoke_error</code> packet (to signal a handshake error).</p>
+<p>More generally, the above codes remain above all idiomatic. The implementations
+are a bit more complicated but globally, the use of the duality principle and
+the design of GADTs has been done in this sense. So don't be afraid if the code
+doesn't work directly.</p>
+<h2 id="bob-a-little-introduction"><a class="anchor" aria-hidden="true" href="#bob-a-little-introduction"></a>Bob, a little introduction</h2>
+<p>After an introduction of Bob's heart, we can discuss the project itself!
+Another part, just as technical, remains to be explained but this will be done
+in another article.</p>
+<p>Bob is still a small program whose objective is accessibility. It was
+<a href="https://github.com/Armael">Armael</a> who launched me (unknowingly) on this project when we wanted
+to share a unikernel built with <a href="https://builds.robur.coop">builds.robur.coop</a>. He then
+advised me to use <a href="https://github.com/schollz/croc"><code>croc</code></a> and when I installed it I thought that such
+a software could take advantage of Cosmopolitan and be available everywhere as
+a polyglot executable.</p>
+<p>After several researches which led to <a href="https://github.com/dinosaure/spoke">Spoke</a> and our
+<a href="https://blog.osau.re/articles/spoke.html">article</a> on the creation of a cryptographic protocol, I became
+certain that Bob was becoming a more and more interesting software in its use
+but also in its design. This is also the occasion to use MirageOS to propose
+a relay as unikernel (which is now running since a few weeks!).</p>
+<p>In short, Bob is already available and usable even if the release has not yet
+been made - it is making us implement tests now. You can <a href="https://github.com/dinosaure/bob/suites/7552450462/artifacts/311735203">download</a>
+it from the GitHub Actions repository where we systematically compile the
+program with Cosmopolitan.</p>
+<p>It's still quite simple to use<sup><a href="#fn2">2</a></sup>:
+<img src="../images/bob.gif" alt="bob" ></p>
+<p>On Windows, drag'n and drop a file to <code>bob.com</code> works to send a file and double
+clicking on <code>bob.com</code> to receive also works - you don't have to be a computer
+expert to use Bob!</p>
+<hr />
+<p><tag id="fn2"><strong>2</strong></tag>: For <code>zsh &lt; 5.9</code>, a bug persists. The shell does not
+recognize <code>bob.com</code> as an executable. The user can <em>assimilate</em> the binary with
+<code>sh -c &quot;./bob.com --assimilate&quot;</code>. By this way, <code>bob.com</code> is assimilated into
+your local host format.</p>
+<p>An other situation can appear with <code>binfmt_misc</code> where your shell wants to
+execute <code>bob.com</code> as a Wine application. For such case, Cosmopolitan provides
+an <a href="https://justine.lol/apeloader/#binfmt_misc">installer</a> which fills <code>binfmt_misc</code> with the <a href="https://justine.lol/ape.html">APE</a>
+format.</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>We'll probably do a release of Bob in September after the holidays to polish up
+the whole distribution - and may be ensure reproducibility of the executable
+thanks to the excellent work of <a href="https://github.com/hannesm">Hannes</a> and <a href="https://robur.io/">robur.io</a>.</p>
+<p>The goal is ultimately simple, to make sure that everyone can share files on
+all platforms without any prerequisites. But the project is still
+fundamentally useful. Thanks to <a href="https://robur.io/">robur.io</a> for giving me the time to
+experiment and go further on topics I'm passionate about - and if you think
+what we're doing is fun and useful, you can of course <a href="https://robur.io/Donate">contribute</a>
+financially to what we're doing.</p>
+<p>I hope this article shows another aspect of GADTs that is outside the
+<code>printf</code>/lambda-calculus box. I also hope that it shows our artisanal
+methodology which finally adds a little more human touch to these little
+programs.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteMiou, a simple scheduler for OCaml 5
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Miou, a simple scheduler for OCaml 5</h1>
+    <ul class="tags-list"><li>OCaml</li><li>Scheduler</li><li>Community</li></ul><p>As mentioned in my <a href="https://twitter.com/Dinoosaure/status/1690987136814874624">thread</a>, we've recently been working on
+implementing a scheduler in <a href="https://robur.coop/">Robur</a>.</p>
+<p>This short article will attempt to present one essential aspect (there are
+several) of Miou: how it schedules tasks and why it schedules tasks in this way.
+These questions assume that there can't only be one and only one scheduler: a
+scheduler is defined by a &quot;task management policy&quot; which necessarily corresponds
+to a particular use. We're going to spell all this out, so that future Miou
+users are fully aware of the implications of using Miou.</p>
+<h2 id="cooperative-or-preemptive"><a class="anchor" aria-hidden="true" href="#cooperative-or-preemptive"></a>Cooperative or preemptive</h2>
+<p>The implementation of a scheduler meets specific objectives which can be seen in
+its design and behaviour. For our part, we would like a scheduler that can
+correspond to a fundamentally preemptive world: in other words, a world where
+<em>events trigger tasks</em>.</p>
+<p>This approach should be contrasted with (but not opposed to) optimising the
+order in which tasks are carried out in order to obtain the result as quickly as
+possible: this is not our objective.</p>
+<p>All OCaml schedulers, however, had to deal with one problem. The problem is that
+we're <strong>not</strong> able to preempt a task/function in OCaml.<sup><a href="#fn1">1</a></sup></p>
+<hr>
+<p><tag id="fn1"><strong>1</strong></tag>: Technically, only Garbage Collector is preemptive of
+tasks, but we'll look at what this means in more detail.</p>
+<h2 id="preemption"><a class="anchor" aria-hidden="true" href="#preemption"></a>Preemption</h2>
+<p>Preempt is a term found in the implementation of schedulers. It is the opposite
+of &quot;cooperate&quot;. Preempt means that a scheduler is able to stop a task (for a
+multitude of reasons). Cooperating leaves the possibility of <em>suspension</em> to the
+tasks themselves: they decide when they can stop.</p>
+<p>Stopping a task does not mean that it has finished; stopping is suspending.
+Suspension consists of stopping a task at a point. This suspension produces a
+state that allows the task to be resumed at the point where it stopped.
+Suspension can be caused by the scheduler (it is preemptive), or by the task
+itself (they cooperate).</p>
+<p>Now, as far as OCaml (and OCaml 5) is concerned, if we consider a task to be a
+function, we cannot stop a function. A function can stop itself (thanks to
+effects - technically we'll see that) but nobody except the GC can stop a
+function. Even the GC can only stop a function at certain points (when
+allocating). But it's clear that you can't create a preemptive system on
+functions in OCaml.</p>
+<h2 id="the-suspension"><a class="anchor" aria-hidden="true" href="#the-suspension"></a>The suspension</h2>
+<p>Even before we talk techniques, we already have problems... But if we insist on
+the terms, it's to find out what our implementation is based on (as well as the
+choices we've made). If we absolutely want to be preemptive on functions, then a
+preemptive scheduler should be able to:</p>
+<ol>
+<li>launch a task</li>
+<li>suspend a task: stop it at a point and produce a state</li>
+<li>manipulate this state (keep it somewhere)</li>
+<li>restart/continue the task from that state</li>
+</ol>
+<p>In OCaml, we're able to do all that, but there's a subtlety:</p>
+<pre><code class="language-ocaml">type 'a t =
+  | Launch : (unit -&gt; 'a) -&gt; 'a t
+  | Finished of 'a
+  | Suspended : ('a, 'b) Effect.Shallow.continuation * 'a Effect.t -&gt; 'b t
+
+let handler =
+  let open Effect.Shallow in
+  let retc v = Finished v in
+  let exnc = raise in
+  let effc
+    : type c. c Effect.t -&gt; ((c, 'a) Effect.Shallow.continuation -&gt; 'b) option
+    = fun effect -&gt; Some (fun k -&gt; Suspended (k, effect)) in
+  { Effect.Shallow.retc; exnc; effc }
+
+let continue = function
+  | Launch fn -&gt;
+    Effect.Shallow.(continue_with (fiber fn) () handler)
+  | Finished v -&gt; Finished v
+  | Suspended (k, effect) -&gt;
+    let v = perform effect in
+    Effect.Shallow.(continue_with k v handler)
+</code></pre>
+<p>This code shows that a simple function <code>fn</code> can be transformed to a <em>task</em> which
+can be launched latter. This task can be manipulated (stored, ordered,
+etc.) and can be restarted/continued if it is suspended.</p>
+<p>The subtlety is in the suspension. We can obtain a suspension, but only if the
+task produces an effect: it's not us who decides whether to suspend, it's the
+task itself that decides when it can suspend.</p>
+<p>Now, why does suspension matter so much? We could be satisfied with this little
+code and then implement a scheduler from it (according to our 4 rules),
+regardless of whether it's the task that decides to suspend or the scheduler
+that decides. Well, it's from here that we need to make our choices explicit.</p>
+<h2 id="system-events"><a class="anchor" aria-hidden="true" href="#system-events"></a>System events</h2>
+<p>Let's draw a parallel with my life. I have a phone and people call me. The
+problem is that I don't answer the phone. I do what I have to do and then (and
+only then) I deal with the calls. Not that this approach is bad, but it makes me
+<strong>unavailable</strong>: it makes me unavailable to my father to help him close up his
+house the same day, and unavailable to the deliveryman who wants to drop off the
+package. Or unavailable to listen to an after-sales service to subscribe to a
+new offer...</p>
+<p>The important thing to remember here is that I prioritise my tasks in relation
+to external events, and in doing so I make myself <strong>unavailable</strong> to others.</p>
+<p>A computer is the same thing! A computer does things (calculations) but it also
+responds to external events (receiving a connection, reading a TCP/IP packet,
+etc.). So the way a computer manages its tasks is very important when it comes
+to the type of applications you want to run. Which leads us to say one essential
+thing about our task management (for a computer as for a human): there are no
+optimal solutions!</p>
+<p>But let's go back to what we wanted: events trigger tasks.</p>
+<p>In contrast to my lifestyle, I'd like my computer to be available to respond to
+any events (although its job is to do things for me). This is characteristic of
+a certain task management policy: it's called a round-robin scheduler.</p>
+<h2 id="a-round-robin-scheduler"><a class="anchor" aria-hidden="true" href="#a-round-robin-scheduler"></a>A round-robin scheduler</h2>
+<p>The principle of a round-robin scheduler is very communist^Wsimple. It consists
+of having a list of tasks and executing these tasks one after the other.
+However, a task cannot monopolise the CPU. It can happen that a task never
+finishes, in which case all the other tasks are blocked (including some that
+could unblock the first task).</p>
+<p>The idea is to limit the execution of a task. This limit is called the <em>quanta</em>.
+In general, we choose the time: a task can only be executed for 100ms, then we
+move on to the next task.</p>
+<p>This is where our problem of preemption comes in. We would like to suspend a
+task according to a limit (and not have it decide to suspend itself). It's now
+that we're going to introduce the most essential thing about Miou (and which
+should be explicit to any round-robin scheduler): our <em>quanta</em> is the emission
+of an effect. So let's implement the basics of a scheduler, i.e. scheduling and
+waiting for a task.</p>
+<pre><code class="language-ocaml">type task = Task : 'a t -&gt; task
+type 'a promise = 'a option ref
+type _ Effect.t += Spawn : (unit -&gt; 'a) -&gt; 'a promise Effect.t
+type _ Effect.t += Await : 'a promise -&gt; 'a Effect.t
+
+let perform
+  : type c. task list ref -&gt; c Effect.t -&gt; [ `Continue of c | `Suspend ]
+  = fun todo -&gt; function
+  | Spawn fn -&gt;
+    let value = ref None in
+    let task = Launch (fun () -&gt; value := Some (fn ())) in
+    todo := !todo @ [ Task task ] ;
+    `Continue value
+  | Await value -&gt;
+    begin match !value with
+    | Some value -&gt; `Continue value
+    | None -&gt; `Suspend end
+  | _ -&gt; invalid_arg &quot;Invalid effect&quot;
+
+let continue todo = function
+  | Launch fn -&gt;
+    Effect.Shallow.(continue_with (fiber fn) () handler)
+  | Finished v -&gt; Finished v
+  | Suspended (k, effect) -&gt;
+    match perform todo effect with
+    | `Continue v -&gt; Effect.Shallow.(continue_with k v handler)
+    | `Suspend -&gt; Suspended (k, effect)
+
+let run fn v =
+  let result = ref None in
+  let rec go = function
+    | [] -&gt; Option.get !result
+    | Task task :: rest -&gt;
+      let todo = ref rest in
+      match continue todo task with
+      | Finished _ -&gt; go !todo
+      | (Launch _ | Suspended _) as task -&gt; go (!todo @ [ Task task ]) in
+  let task = Launch (fun () -&gt; result := Some (fn v)) in
+  go [ Task task ]
+</code></pre>
+<p>Here, we return to our previous code where we specify the <code>perform</code> function
+which consumes our effects. The <code>continue</code> function changes slightly so that it
+can modify the TODO list in the case of <code>Spawn</code>. According to <code>perform</code>, the
+<code>continue</code> function looks at whether to keep the suspension or continue the
+function with the given value. Here's a code example:</p>
+<pre><code class="language-ocaml">let spawn fn = Effect.perform (Spawn fn)
+let await prm = Effect.perform (Await prm)
+
+let fiber () =
+  let prm = spawn @@ fun () -&gt; print_endline &quot;Hello&quot; in
+  print_endline &quot;World&quot;;
+  await prm
+
+let () = run fiber ()
+(* It prints:
+   World
+   Hello
+*)
+</code></pre>
+<p>Here, there are 2 things to recognise about a round robin scheduler:</p>
+<ol>
+<li>only consume a single effect (as our <em>quanta</em>) produced by a task</li>
+<li>add the task to the end of our TODO list</li>
+</ol>
+<h3 id="availability"><a class="anchor" aria-hidden="true" href="#availability"></a>Availability</h3>
+<p>The main advantage of a round-robin scheduler is that it shares the quantas
+<strong>fairly</strong>. This is one of the reasons why we chose time as a quanta, as we want
+to share CPU time fairly above all else. Here, the choice is to share the
+production of effects fairly between all the tasks (since this is really the
+only way we can do it).</p>
+<p>We then have to apply ourselves to respecting this rule and considering the
+reception of external events following the production of a quanta. This is where
+we open a window of availability for our application in order to receive events
+from the system.</p>
+<p>This question is central to the objective of considering that events trigger
+tasks. It was all the more of a question (and a difference) for <code>lwt</code> and
+<code>async</code>: when do we suspend tasks? More to the point, when do we suspend tasks
+so that our application is available to receive system events?</p>
+<p>This is the crux of the matter, as this availability has an impact, especially
+on the performance of a so-called pure application (which interacts very little,
+if at all, with the system). It's also at this point that things need to be as
+explicit as possible for the user. Developing a library with a scheduler means
+knowing this kind of detail so that it can work well with applications requiring
+a high level of availability (typically an HTTP server).</p>
+<p>Miou does not (and cannot, in view of what we have said above) offer better or
+worse availability than other schedulers. Miou can also be slower when executing
+pure applications<sup><a href="#fn2">2</a></sup>, given the task management policy of a
+round-robin scheduler. However, Miou <strong>explicitly</strong> states one essential thing:
+effects suspend tasks because we want system events to trigger tasks. And its
+development will only be guided by this <em>mantra</em>.</p>
+<hr>
+<p><tag id="fn2"><strong>2</strong></tag>: Once again, pure applications are those that interact
+very little with the system. They do not require a high level of availability,
+but above all a &quot;smart&quot; scheduler that prioritises tasks in order to find an
+optimum execution order. In this case, something like <a href="https://github.com/c-cube/moonpool">moonpool</a> might
+be more interesting.</p>
+<h2 id="an-api-issue"><a class="anchor" aria-hidden="true" href="#an-api-issue"></a>An API issue</h2>
+<p>This 'little' introduction to Miou allows us to clarify a point that seems
+<em>spontaneous</em> in our explanation. The idea of &quot;quanta&quot;, of considering the
+latter as the production of an effect, of what is possible with OCaml 5 and
+suspension, while considering a certain <em>preemptibility</em> for our scheduler (by
+considering that the user knows, <em>de facto</em>, that the production of an effect
+allows the application to receive events from the system), all this helps to
+explain why we use <code>Effect.Shallow</code> instead of <code>Effect.Deep</code>.</p>
+<p>That's right! We have two interfaces for managing effects in OCaml. Why one
+would be better than the other, I don't know. What is certain is that if we once
+again consider our mantra <em>&quot;effects suspend tasks and events trigger tasks&quot;</em>, we
+should spontaneously use <code>Effect.Shallow</code>.</p>
+<p>The latter allows you to manage just <strong>one</strong> effect. It attaches a <code>handler</code> to
+a function which, depending on what the function does (a simple calculation,
+producing an effect, or terminating), produces a state, our <code>'a t</code>. The idea is
+to remain constrained by what OCaml has to offer in order to systematically
+respect our <em>mantra</em>: one effect is needed to suspend a task.</p>
+<p>Note that we could get away with using <code>Effect.Deep</code>. The latter is not
+incompatible. However, the aim of <code>Effect.Deep</code> is clear: to manage the
+production of <strong>several</strong> effects. This is, of course, at odds with our rule.</p>
+<h3 id="the-state-module"><a class="anchor" aria-hidden="true" href="#the-state-module"></a>The <code>State</code> module</h3>
+<p>In Miou's <a href="https://docs.osau.re/miou/">documentation</a>, we sometimes refer to the <code>State</code>
+module. This defines the most basic task logic.</p>
+<p>In our experience, an API isn't just a collection of types and functions; an API
+<em>enforces</em> a certain use. From all our iterations on <code>Effect.Deep</code> and
+<code>Effect.Shallow</code>, we weren't that happy with what they offered. Sometimes, the
+API was too permissive or could only match our usage after a whole ceremony.
+Don't get me wrong, I'm not criticizing the API authors here, I'm just saying
+that these APIs shouldn't be used as they are!</p>
+<p>So, the <code>State</code> module is an abstraction of the <code>Effect.Shallow</code> module, which
+is better suited to our purposes. And as an API enforces a usage, the aim of the
+<code>State</code> module is to force us to respect the rules of a round-robin scheduler.</p>
+<h1 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h1>
+<p>This article clarifies how our scheduler works. I hope it provides you with an
+accessible mental model for thinking about designing an application with Miou.
+It also clarifies Miou's &quot;internals&quot;, which are the bricks that sediment the
+scheduler's behavior.</p>
+<p>Particular attention is paid to the <code>State</code> module, as it's here that the rules
+of the game are set. Miou then adds elements such as domains and resource
+management (with the idea of <em>ownership</em>), which we'll see in other articles.
+It's worth noting that this article allows you to make a mini-scheduler.</p>
+<p>Hopefully, it will also demystify a key component of an application. Xavier
+Leroy once said that the GC <em>&quot;is like a god from ancient mythology: mighty, but
+very irritable&quot;</em>. The same can be said of a scheduler if we don't take the
+time to explain its task management policy. Let's make sure it doesn't!</p>
+<h2 id="a-final-note-on-preemption-and-cooperation"><a class="anchor" aria-hidden="true" href="#a-final-note-on-preemption-and-cooperation"></a>A final note on preemption and cooperation</h2>
+<p>If you have followed correctly, Miou is not a preemptive scheduler but the use
+of effects (defined by Miou or another library) are points (which we will call
+synchronisation points) where the application is able to receive system events.
+We could spend hours on this question, as it was the initial schism between
+<code>lwt</code> and <code>async</code>. Some will say that all these points make us &quot;waste time&quot;
+which, in fact, is a recognised problem with a round-robin scheduler.</p>
+<p>However, our experience in implementing protocols and services in Robur tells us
+that it's better to have a lot of synchronisation points (even if it means being
+slower) than none at all. Again, this depends on the type of application.</p>
+<p>You could also reconsider the idea of using effects as synchronisation points
+(as the <code>&gt;&gt;=</code> could have been this kind of point for <code>lwt</code> for example - which
+is not the case). This is where usage is important. For example, I've put
+<code>Lwt.pause</code> in certain places several times just to increase the availability of
+my applications. Some people will be satisfied with this, considering that we're
+explicitly trying to create this synchronisation point. However, others, like
+me, will be a little annoyed at having to make these points explicit.</p>
+<p>Once again, Miou is no better or worse. It's just a question of explaining these
+<em>details</em> as we do here.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

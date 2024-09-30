@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteEq(af), timing attack!
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Eq(af), timing attack!</h1>
+    <ul class="tags-list"><li>Security</li><li>Release</li><li>OCaml</li><li>Library</li></ul><p>The MirageOS project is aware about security issues. This goal is strong when,
+at the beginning, the idea of a small <em>unikernel</em> can ensure (by intuition) a
+small attack surface. By this way, we want to follow as possible as we can
+improvements into security stacks such as TLS.</p>
+<p>Of course, we are not a huge team and some of us don't have a strong knowledge
+about security. This topic is highly complex and it's easy to think that we are
+secure - and, by facts, we are not. However, it gives to us an opportunity to
+learn and improve what we can find about this topic and go on our way to try to
+provide the best as we can.</p>
+<p>This article wants to show a little project which wants to solve a security
+issue, the timing attack. We will see what we did on this purpose to be able to
+improve <a href="https://github.com/mirage/mirage-crypto/">mirage-crypto</a>.</p>
+<h2 id="a-timing-attack"><a class="anchor" aria-hidden="true" href="#a-timing-attack"></a>A timing attack!</h2>
+<p>It's clearly not an usual attack for me and I did not (yet!) understand in
+which way it's possible to use this side-channel attack over a complex
+black-box such as an SMTP service. However, the first lesson about security is
+to agree with the fact that when you can imagine this attack (even if, by your
+technical means, it's not possible), someone else into our world has the
+ability to use this attack.</p>
+<p>The point is not to try to think how this kind of attack is possible but to
+assert that this attack <strong>is</strong> possible.</p>
+<p>The timing attack is in this case where we use the time to try to introspect
+data such as a password. The idea is simple, we can take this simple <code>equal</code>
+function:</p>
+<pre><code class="language-ocaml">let equal s1 s2 =
+  let res = ref true in
+  let idx = ref 0 in
+  if String.length s1 &lt;&gt; String.length s2
+  then false
+  else
+    ( while !idx &lt; String.length s1 &amp;&amp; !res
+      do res := s1.[!idx] = s2.[!idx] ; incr idx done ; !res )
+</code></pre>
+<p>If we are in the case where we want to compare the given password by the user
+and the password stored into our database (or their hashes), we will use this
+function - and allow the user to enter into a <em>secured</em> area.</p>
+<p>However, we can see that the time spent by <code>equal</code> depends on given inputs <code>s1</code>
+and <code>s2</code>.</p>
+<h3 id="the-worst-case"><a class="anchor" aria-hidden="true" href="#the-worst-case"></a>The worst case.</h3>
+<p>Imagine that the atomic operation <code>s1.[!idx]</code> (or <code>s2.[!idx]</code>) spend 1 second
+(like 1 <em>CPU tick</em>). So, for each iteration into our loop, we will spend 2
+seconds <em>while <code>!res</code> still is <code>true</code></em>. That means when we meet 2 different
+bytes, we leave the loop<sup><a href="#fn1">1</a></sup>.</p>
+<p>Now, imagine we have these values:</p>
+<pre><code class="language-ocaml">equal &quot;aabb&quot; &quot;aaaa&quot; ;;
+</code></pre>
+<p>We can easily infer that this function will spend 6 seconds (2 seconds for
+first characters, 2 seconds for second characters, 2 seconds for third
+characters and we leave the loop). And about equal values such as:</p>
+<pre><code class="language-ocaml">equal &quot;toto&quot; &quot;toto&quot; ;;
+</code></pre>
+<p>We will spend 8 seconds (and return <code>true</code>). The time needed to compute the
+<code>equal</code> function depends on given inputs. By this way, if we observe time
+needed to be authenticated from a <em>login</em> page, we can infer values given into
+the <code>equal</code> function.</p>
+<p>Finally, from that fact, imagine that <code>s1</code> is the given password by us and <code>s2</code>
+is the password stored into our database, we can infer just with the time if we
+are close to be equal to the password stored into our database.</p>
+<p><tag id="fn1"><strong>1</strong></tag>: In C, the case appears when we <code>return false</code>
+directly which is a jump and leaves the loop as we do in OCaml.</p>
+<h3 id="a-smart-brute-force-attack"><a class="anchor" aria-hidden="true" href="#a-smart-brute-force-attack"></a>A smart brute-force attack.</h3>
+<p>So now we can imagine a tool which will try all possibilities. It will record
+times spent for each random inputs. Then, when it appears that from an input
+<code>t0</code>, time spent differs (is lower than) from an input <code>t1</code>, we can imply that
+our <code>equal</code> function go a bit further when it scanned our input <code>t1</code> (than
+<code>t0</code>).</p>
+<p>By this fact, we can imply that <code>t1</code> is more close to the expected password
+than <code>t0</code> and we can redo the same operation but with a new base <code>t1</code> - and by
+this way, discard all others next (and useless) possibilities with <code>t0</code> as a
+base.</p>
+<p>Eq(af) gives to you an example of this attack. Of course, we plugged into our
+operations an <code>Unix.sleep</code> to be able to see a real difference when we call our
+<code>equal</code> function. Finally, the result is pretty good:</p>
+<pre><code class="language-sh">$ dune exec attack/attack.exe
+Random: [|253;164;168;66;47;219;88;152;128;242;216;123;|].
+7c8ceadc51d33cadc97cce73fc7c86a1
+7c8ceadc51d33cadc97cce73fc7c86a1
+</code></pre>
+<p>The second line is the expected hash, the third line is the hash found only by
+an introspection of the time. The first line is the seed given by the random to
+be able to replicate the result. This tool does not work all the time!</p>
+<h2 id="too-deep-to-be-dangerous"><a class="anchor" aria-hidden="true" href="#too-deep-to-be-dangerous"></a>Too deep to be dangerous?</h2>
+<p>Of course, into the real world, our <code>equal</code> function is much much much more
+fast than some seconds. However, even if it can be hard to track how long
+<code>equal</code> spend, it's not impossible. I mean, it's a bit hard but a way exists to
+know how long any function spend.</p>
+<p>This way is the <em>micro</em>-benchmark! Of course, when you want to compare speed of
+your functions, you introspect time! So if we can do that usually to check
+which function is faster than the other, we can apply the idea of the benchmark
+on two call of the same <code>equal</code> function but with different inputs.</p>
+<h3 id="eqaf-does-the-test-for-you"><a class="anchor" aria-hidden="true" href="#eqaf-does-the-test-for-you"></a>Eq(af) does the test for you</h3>
+<p>So, our distribution comes with a little benchmark tool which wants to see how
+long <code>equal</code> spend when we give to it 2 different values and 2 equal values.
+Then, we <em>extrapolate</em> results.</p>
+<p>We <em>run</em> this function 1 time, 2 times, 3 times, ... to 3000 times and we
+record times for each run. From that, we are able to plot a curve. So about
+expected results:</p>
+<ul>
+<li>If our curve is a line, that means for each <em>run</em>, we spend the same time
+whatever inputs.</li>
+</ul>
+<p><img src="../images/eqaf_01.png" alt="eqaf01" ></p>
+<ul>
+<li>If our curves is not exactly a line, that means time spent depends on inputs</li>
+</ul>
+<p><img src="../images/eqaf_02.png" alt="eqaf02" ></p>
+<p>So from this curve, we apply a <em>linear-regression</em> to see if it's a line or
+not. From that, we can get a ~R²~ which is a regression coefficient and it
+tells to us if it's a <em>true</em> line (where <code>R² &gt;= 0.99</code>) or not.</p>
+<p>As you can see, we have some noises (some points are not strictly aligned) -
+it's because the inherent volatility when we want to record the time. It's why
+we need to apply a <em>linear-regression</em> to delete as much as possible this
+noise. An other factor about that is the context where you execute your
+function, the scheduler can decide to stop our <code>equal</code> function and do
+something else (but our <code>equal</code> function still spends his time). Finally, it
+still is hard to track the time.</p>
+<h2 id="how-to-fix-it"><a class="anchor" aria-hidden="true" href="#how-to-fix-it"></a>How to fix it?</h2>
+<p>The easiest way to avoid this side-channel attack is to spend exactly the same
+time for any inputs. At the end, even if we encounter different bytes, we will
+continue to scan inputs.</p>
+<pre><code class="language-ocaml">let equal s1 s2 =
+  if String.length s1 &lt;&gt; String.length s2 then false
+  else
+    ( let res = ref true in
+      for idx = 0 to String.length s1 - 1
+      do res := s1.[idx] = s2.[idx] &amp;&amp; !res done ;
+      !res )
+</code></pre>
+<h3 id="into-the-ocaml-side"><a class="anchor" aria-hidden="true" href="#into-the-ocaml-side"></a>Into the OCaml side!</h3>
+<p>However, into the OCaml world, the deal can be much more complex that what we
+can imagine. Even if it's <em>easy</em> to translate an OCaml code to an assembly
+code, the compiler can emit some <em>jump</em> and produce a <em>non constant-time</em> (or
+a non <em>branch-less</em>) function at the end.</p>
+<p>In our example, the only idea to use <code>None</code> and <code>Some</code> instead <code>false</code> and
+<code>true</code> into our code implies a call to the garbage collector - and a <em>jump</em> in
+the emitted assembly. This case appear when we want to implement <code>compare</code> and
+keep somewhere (into our <code>int option</code>) the subtraction of different bytes while
+the loop.</p>
+<p>Into Eq(af), we did a huge introspection about the assembly generated to ensure
+that we don't have any <em>jump</em> and any assembly instructions will be executed
+regardless inputs - and only from that we can say that our function is
+<em>constant-time</em><sup><a href="#fn2">2</a></sup>.</p>
+<p><tag id="fn2"><strong>2</strong></tag>: <em>constant-time</em> is not a good word where it can have
+an other signification when we talk about complexity and algorithm. And it's
+not really true when the time still depends on the length of the given input.</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>Eq(af) provides a quite easy function and anybody can re-implement it. But it
+comes with tools which want to check our assumption, the time spent can not
+leak any information. Or course, as we showed, it can be hard to check that.</p>
+<p>We have different tools to check/prove that where, at this time, we only do a
+check but we can go further by an introspection of the emitted code by an other
+tool to see if are surely <em>branch-less</em>.</p>
+<p>At the end, Eq(af) is used by some people who are aware about security issues
+and it's why we decided to use it as a default into <a href="https://github.com/mirage/digestif/">digestif</a> to
+protect any users from this side-channel attack.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

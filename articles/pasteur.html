@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websitePasteur is up!
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Pasteur is up!</h1>
+    <ul class="tags-list"><li>OCaml</li><li>MirageOS</li><li>unikernel</li></ul><p>After much experimentation with OCaml, <code>js_of_ocaml</code> and MirageOS, Pasteur is
+finally updated to contain only OCaml code. Indeed, I keep in mind the goal to
+do everything in OCaml!</p>
+<p>Pasteur is a good unikernel to experiment with what is possible with OCaml. The
+first difficulty with Pasteur was the multipart form. I was <em>lucky</em> to spend 5
+years reading RFCs to finally implement <code>multipart_form</code>. The second difficulty
+was JavaScript. Like <a href="https://sebsauvage.net/wiki/doku.php?id=php%3Azerobin">zerobin</a>, I wanted to have the ability to paste
+and <strong>encrypt</strong> content on the client side. I ended up experimenting quite a
+bit with <a href="https://github.com/dbuenzli/brr"><code>brr</code></a>. Then, I had the opportunity to integrate another project
+that fulfilled a specific use case: having a read-only file system to hold the
+CSS and JavaScript files that the HTTP server would transmit. It was also a
+question of parting with Conduit once and for all. Finally, with MirageOS 4,
+the goal was:</p>
+<blockquote>
+<p>Prendre des p'tits bouts d'trucs et puis les assembler ensemble</p>
+</blockquote>
+<p>In this article we will explain all these points one by one and give an
+overview of the ecosystem and what is finally possible with MirageOS.</p>
+<h2 id="multipart_form-rfcs-and-ecosystem"><a class="anchor" aria-hidden="true" href="#multipart_form-rfcs-and-ecosystem"></a><code>multipart_form</code>, RFCs and ecosystem</h2>
+<p>From my experience with email, I was able to read <a href="https://www.ietf.org/rfc/rfc2045.txt">RFC 2045</a> (and its
+sequel) which explains the <code>multipart/form</code> format. The latter is used by HTTP
+1.1 (and it seems to me H2) to transmit information from an HTML form. There
+are several ways of transmitting this information, by a GET request and a URL
+which encodes the information (<code>application/x-www-form-urlencoded</code>) or by a
+POST request which encodes in its content, in <code>multipart/form</code> format, this
+information.</p>
+<p>The latter is preferred in particular for its ability to upload files. As far
+as emails are concerned, it is through this method that one can transmit an
+attachment for example.</p>
+<p>There are mainly 2 difficulties with the multipart/form format:</p>
+<ol>
+<li>format recursion, a multipart/form can contain a multipart/form</li>
+<li>transmission of content without exploding the memory</li>
+</ol>
+<h3 id="recursion"><a class="anchor" aria-hidden="true" href="#recursion"></a>Recursion</h3>
+<p>I blogged a whole day to really understand after 6 months of reading RFCs, we
+could put an email in an email. But more globally, the multipart format is not
+a linear description of several contents but a tree of contents!</p>
+<p>The real problem with this encoding is that recursion is not discovered through
+a formal definition of this format but through a description...</p>
+<pre><code class="language-bnf">multipart-body := [preamble CRLF]
+                  dash-boundary transport-padding CRLF
+                  body-part *encapsulation
+                  close-delimiter transport-padding
+                  [CRLF epilogue]
+
+body-part := MIME-part-headers [CRLF *OCTET]
+
+encapsulation := delimiter transport-padding
+                 CRLF body-part
+</code></pre>
+<p>Looking at this description, we can say that <code>multipart/form</code> is only a
+succession (see <code>encapsulation</code>) of <code>body-part</code>. We can reduce this format to a
+list of <code>OCTET</code>s associated with metadata (<code>MIME-part-headers</code>).</p>
+<p>But that's without counting the next paragraph:</p>
+<blockquote>
+<p>The use of a media type of &quot;multipart&quot; in a body part within another
+&quot;multipart&quot; entity is explicitly allowed.  In such cases, for obvious
+reasons, care must be taken to ensure that each nested &quot;multipart&quot;
+entity uses a different boundary delimiter.</p>
+</blockquote>
+<p>From this description, <code>OCTET</code> can contain a multipart/form so...</p>
+<h3 id="memory-consumption-and-streams"><a class="anchor" aria-hidden="true" href="#memory-consumption-and-streams"></a>Memory consumption and streams</h3>
+<p>The other essential point of <a href="https://github.com/dinosaure/multipart_form"><code>multipart_form</code></a> is its ability,
+not to output the contents of the form as they are, but a <strong>stream</strong> of these
+contents. Indeed, in the case of uploading a file, we would not want to store
+all the content in memory and then process it but rather let the user decide
+how to consume the upload of the said file.</p>
+<p>In this way, the <code>multipart/form</code> must be parsed and the content transmitted at
+the same time - so that the user can consume/save it somewhere at the same
+time:</p>
+<pre><code class="language-ocaml">val both : unit fiber * unit fiber -&gt; unit fiber
+val save_into_random_file : string stream -&gt; unit fiber
+
+let post http_body =
+  let `Parse fiber, stream_of_contents = Multipart_form.parse http_body in
+  let save () = Stream.get stream_of_contents &gt;&gt;= function
+    | None -&gt; return ()
+    | Some stream -&gt; save_into_file stream &gt;&gt;= save in
+  both fiber (save ())
+</code></pre>
+<p>In this example, the decoding of the multipart document is done in conjunction
+with saving the contents in random files. If the code runs, it can limit memory
+consumption to a ceiling regardless of the size of the files sent.</p>
+<p><img src="../images/multipart.png" alt="multipart" ></p>
+<p>The image is not of good quality and the information is not clear, but one can
+note in ordinate the memory consumption and in abcissa, the time. We can see
+that we have spikes that reach a ceiling. This is the case where we save part
+of the file in memory and as soon as we reach the ceiling, we execute the
+<code>save</code> function which consumes the file.</p>
+<h3 id="the-multipart_project-project"><a class="anchor" aria-hidden="true" href="#the-multipart_project-project"></a>The <code>multipart_project</code> project</h3>
+<p>I would really like to thank <a href="https://github.com/Armael">Armaël</a> who helped me work on the API and
+make sure of these memory consumption aspects. Anyway, the project ended up
+being integrated into <a href="https://github.com/aantron/dream">Dream</a>. It is available here:
+<a href="https://github.com/dinosaure/multipart_form">multipart_form</a></p>
+<h2 id="js_of_ocaml-brr-and-security"><a class="anchor" aria-hidden="true" href="#js_of_ocaml-brr-and-security"></a>Js_of_ocaml, <code>brr</code> and security</h2>
+<p>One of Pasteurr's goals was to follow <a href="https://sebsauvage.net/wiki/doku.php?id=php%3Azerobin">zerobin</a> in his design. The
+goal is that the server should not store the paste in clear text and that the
+only person in possession of the encryption key is the author of the paste.</p>
+<p>The trick is to encrypt the content directly in the webbrowser and to transmit
+only the encrypted content to the server (with POST and <code>multipart_form</code>).
+Then, in JavaScript, we can ask (still on the client side) to redirect the
+client to the result of its paste with its key.</p>
+<p>This way, the key is <strong>never</strong> transmitted to the server (or more precisely, to
+the network). This ensures that the content is unbreakable if someone had
+control of the server! To do this, we need to make a JavaScript script to
+encrypt and send the POST request. Of course, writing JavaScript is out of the
+question.</p>
+<p>Fortunately, we have the ability in our OCaml ecosystem to produce JavaScript
+code from OCaml code! Especially since we have a library that gives us access
+to cryptographic functions available from the webbrowser!</p>
+<h3 id="brr"><a class="anchor" aria-hidden="true" href="#brr"></a><code>brr</code></h3>
+<p>So I used <a href="https://github.com/dbuenzli/brr">brr</a>, fixed a little bug and produced a little script that does
+all this. I'd like to give special mention to <a href="https://erratique.ch/software">dbuenzli</a> who always
+makes very succinct and user-friendly APIs - which I haven't yet, but maybe one
+day.</p>
+<pre><code class="language-ocaml">open Brr
+
+val iv : Tarray.Buffer.t
+(* A random [int array] to initialize ciphers *)
+
+let sym_key_gen =
+  let name = Crypto_algo.aes_cbc and length = 128 in
+  Crypto_algo.Aes_key_gen_params.v ~name ~length ()
+
+let sym_exportable_key s =
+  let usages = Crypto_key.Usage.[ encrypt; decrypt; ] in
+  Subtle_crypto.generate_key s sym_key_gen ~extractable:true ~usages
+
+let sym_algo ?iv () =
+  let iv = match iv with
+    | Some iv -&gt; iv
+    | None -&gt;
+      let iv = Tarray.create Tarray.Uint8 16 in
+      let () = Crypto.set_random_values Crypto.crypto iv in Tarray.buffer iv in
+  Crypto_algo.Aes_cbc_params.v ~iv ()
+
+let sym_encrypt ?iv s key clear =
+  Subtle_crypto.encrypt s (sym_algo ?iv ()) key clear
+
+let sym_decrypt ?iv s key cipher =
+  Subtle_crypto.decrypt s (sym_algo ?iv ()) key cipher
+
+let encrypt body =
+  let subtl = Crypto.subtle Crypto.crypto in
+  let* key  = sym_exportable_key subtl in
+  (* encrypt *)
+  let* cipher = sym_encrypt ~iv subtl key body in
+  let  cipher = Tarray.uint8_of_buffer cipher in
+  let  cipher = Tarray.to_hex_jstr cipher in
+  (* save it into the client-side's form *)
+  Form.Data.set data (Jstr.v &quot;paste&quot;) cipher ;
+  (* POST *)
+  let init = Fetch.Request.init
+    ~body:(Fetch.Body.of_form_data data) ~method':post () in
+  let* res = Fetch.request (Fetch.Request.v ~init:init (Jstr.v &quot;/&quot;)) in
+  let* res = Fetch.Body.json (Fetch.Response.as_body res) in
+  (* Export the key *)
+  let* key = Subtle_crypto.export_key subtl Crypto_key.Format.jwk key in
+  let[@warning &quot;-8&quot;]
+    (`Json_web_key key : [ `Buffer of _ | `Json_web_key of _ ]) = key in
+  let* key = Fut.return
+    (Base64.encode (Base64.data_of_binary_jstr (Json.encode key))) in
+  (* Get the page from the server where we save the encrypted paste *)
+  let code = Jv.get res &quot;code&quot; |&gt; Jv.to_jstr in
+  (* Generate the URL of the redirection which includes the key *)
+  let* path = make_path ~key code in
+  let* uri = Fut.return
+    (Uri.of_jstr (Jstr.concat
+      [ Uri.to_jstr (Window.location G.window); path ])) in
+  (* And redirect! *)
+  Window.set_location G.window uri ; Fut.ok () 
+</code></pre>
+<h3 id="mirageos-and-js_of_ocaml"><a class="anchor" aria-hidden="true" href="#mirageos-and-js_of_ocaml"></a>MirageOS and Js_of_ocaml</h3>
+<p>The most difficult part is the integration with MirageOS. From a compilation
+point of view, we have an element/artifact that our unikernel depends on. But
+this does not happen through our cross-toolchain (Solo5) but with the host
+compiler and js_of_ocaml (itself available from the host).</p>
+<p>We should therefore be able to articulate <code>dune</code> (the build system of MirageOS
+4) to explicitly ask to compile our <code>script.ml</code> into <code>script.js</code> using our host
+toolchain (unlike our Solo5 toolchain). In dune's vocabulary, to talk about
+toolchain, we talk about <code>context</code>.</p>
+<p>Fortunately, MirageOS 4 offers two compilation steps, the first of which allows
+us to generate dune rules that can be described in the Mirage project manifest,
+the <code>config.ml</code> file.</p>
+<p>We will first describe how to get our script.js file into the host context
+using js_of_ocaml. Again, the integration of js_of_ocaml with <code>dune</code> has
+become much simpler over time which makes the task easy:</p>
+<pre><code class="language-lisp">(executable
+ (enabled_if (= %{context_name} &quot;default&quot;))
+ (name pasteur_js)
+ (modules pasteur_js)
+ (libraries rresult fmt brr tyxml)
+ (modes js))
+</code></pre>
+<p>Note especially the <code>enabled_if</code> which forces dune to produce our
+<code>pasteur_js.bc.js</code> only in the host context<sup><a href="#fn1">1</a></sup>.</p>
+<p><tag id="fn1"><strong>1</strong></tag>: Indeed, compiling an OCaml script in JavaScript via
+js_of_ocaml with the Solo5 toolchain makes no sense. The Solo5 toolchain
+wants to correctly <strong>link</strong> OCaml objects with the Solo5 kernel. For this
+purpose, the Solo5 toolchain is restrictive: no dynlink, no <code>*.so</code>, no <code>META</code>
+required by <code>js_of_ocaml</code> to load <code>otherlibs/</code> which are definitely not
+provided in anyway by <code>ocaml-solo5</code>.</p>
+<p>From the <code>config.ml</code> file, we can describe a new &quot;device&quot;, which is an element
+that can be required by our unikernel and from which we can specify a
+particular dune rule.</p>
+<pre><code class="language-ocaml">let pasteur_js =
+  let dune _info =
+    [ Dune.stanzaf {dune|(subdir public
+ (rule
+  (enabled_if (= %%{context_name} &quot;default&quot;))
+  (deps ../js/pasteur_js.bc.js)
+  (target pasteur.js)
+  (action (copy %%{deps} %%{target}))))|dune} ] in
+  impl ~dune &quot;Pasteur_js&quot; job
+</code></pre>
+<p>The rule here says, still in the context of the host, to move our script into
+the <code>public/</code> folder which essentially contains all the static files needed for
+our website (CSS file, JavaScript, etc). This allows us to precompile our
+<code>pasteur.js</code> file and then integrate it into our unikernel.</p>
+<h2 id="a-read-only-filesystem"><a class="anchor" aria-hidden="true" href="#a-read-only-filesystem"></a>A read-only filesystem</h2>
+<p>Finally, another element that may be interesting in the design of our website
+is the ability to add a &quot;block-device&quot; which would be a file system containing
+everything that is available in the <code>public/</code> folder.</p>
+<p>So I made <a href="https://github.com/dinosaure/docteur">docteur</a>, it's a little program that generates a <code>*.disk</code>
+file. This file can be added to the unikernel as an external resource. The
+advantage of <code>docteur</code> is its compression ratio. If you have a lot of static
+files that look alike, like for example a documentation, <code>docteur</code> offers 2
+levels of compression so that 17.5 GB of HTML files can fit in a 250 MB
+block-device!</p>
+<p>I recently added the device to Mirage which makes it very easy to use:</p>
+<pre><code class="language-ocaml">let public = docteur ~extra_deps:[ &quot;public/pasteur.js&quot; ]
+  &quot;relativize://public/&quot;
+
+let pasteur =
+  foreign &quot;Unikernel.Make&quot;
+    (... @-&gt; kv_ro @-&gt; job)
+
+let () = register &quot;pasteur&quot;
+  [ pasteur $ ... $ public ]
+</code></pre>
+<p>Docteur has the advantage of serializing into a disk file 2 sources:</p>
+<ol>
+<li>a simple folder (like our <code>public</code> folder)</li>
+<li>a Git repository</li>
+</ol>
+<p>The advantage is that these sources can be available locally (like our folder)
+or from the internet (like a remote Git repository). In the latter case, the
+mechanism for &quot;cloning&quot; the remote source is more or less the same as a simple
+<code>git clone</code>.</p>
+<h2 id="paf-le-chien"><a class="anchor" aria-hidden="true" href="#paf-le-chien"></a><code>Paf-le-chien</code></h2>
+<p>Finally, with a lot of experimentation, the abstraction proposed by Conduit
+regarding the server does not seem to be a good design. Indeed, the
+initialization of a server should not go through a dynamic and opaque mechanism
+such as Conduit when we finally want to be explicit in what we use
+(certificate, socket, port, etc.).</p>
+<p>Abstraction is however required in order to inject a particular TCP/IP stack
+and TLS stack. But it seems clear that, in the context of MirageOS, the
+<em>functor</em> seems to be the right solution to this problem after all.</p>
+<p><code>Paf</code> proposes a <em>functor</em> which allows to create several functions in order to
+initialize a server according to what the user wishes.</p>
+<pre><code class="language-ocaml">module type S = sig
+  type stack and flow and ippadr
+
+  type t
+
+  type dst = ipaddr * int
+
+  val init : port:int -&gt; stack -&gt; t Lwt.t
+
+  val http_service :
+    ?config:Httpaf.Config.t -&gt;
+    error_handler:(dst -&gt; Httpaf.Server_connection.error_handler) -&gt;
+    (flow -&gt; dst -&gt; Httpaf.Server_connection.request_handler) -&gt;
+    t Paf.service
+
+  val https_service :
+    tls:Tls.Config.server -&gt;
+    ?config:Httpaf.Config.t -&gt;
+    error_handler:(dst -&gt; Httpaf.Server_connection.error_handler) -&gt;
+    (flow -&gt; dst -&gt; Httpaf.Server_connection.request_handler) -&gt;
+    t Paf.service
+
+  val alpn_service :
+    tls:Tls.Config.server -&gt;
+    ?config:Httpaf.Config.t * H2.Config.t -&gt;
+    error_handler:
+      (dst -&gt;
+      ?request:Alpn.request -&gt;
+      Alpn.server_error -&gt;
+      (Alpn.headers -&gt; Alpn.body) -&gt;
+      unit) -&gt;
+    (dst -&gt; Alpn.reqd -&gt; unit) -&gt;
+    t Paf.service
+
+  val serve :
+    ?stop:Lwt_switch.t -&gt; 't Paf.service -&gt; 't -&gt;
+    [ `Initialized of unit Lwt.t ]
+end
+
+module Make (Time : Mirage_time.S) (Stack : Tcpip.Tcp.S)
+  : S with type stack = Stack.t
+       and type flow = Stack.flow
+       and type ipaddr = Stack.ipaddr
+</code></pre>
+<p>The only abstraction needed is the event loop required by <code>http/af</code> and <code>h2</code> to
+handle reads and writes. The latter is also available in a <em>functor</em> in the
+<code>Paf</code> module and <code>Paf_mirage</code> only ceremonially provides an HTTP server from
+the given TCP/IP stack and an HTTPS server from the same stack and <code>ocaml-tls</code>.
+In this ceremony, there is of course the support of <code>h2</code> which is finally very
+close in terms of API than <code>http/af</code>.</p>
+<h3 id="multiple-iterations"><a class="anchor" aria-hidden="true" href="#multiple-iterations"></a>Multiple iterations</h3>
+<p>The code of Paf is both very succinct and abstract which may be difficult to
+understand for a novice runner but the README.md or the tests give a good
+overview of its use in the context of MirageOS but also outside!</p>
+<p>This shows above all that, beyond the implementations that can be found in
+OCaml of this or that protocol, as far as the MirageOS projects are concerned,
+a substantial API work (which can take several years) is done and leads the
+overall development and maintenance of our ecosystem.</p>
+<p>In this, I would like to thank <a href="https://github.com/CraigFe">CraigFe</a>, <a href="https://github.com/hannesm">Hannes</a> and
+<a href="https://github.com/TheLortex">Lucas</a> for helping me iterate on <code>Paf</code> several times to get closer
+and closer to the right solution for HTTP servers. It also and above all shows
+that an API work remains fundamentally collective since it becomes possible
+only from interactions and uses.</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>The website is available here: <a href="https://paste.osau.re/">paste.osau.re</a>. What this article shows
+is the involvement of people from the MirageOS community and elsewhere who have
+added their vision directly or indirectly to the project. The development in
+<em>onion layer</em> of what will allow to produce Pasteur shows the reusability of
+the knowledge of each one near other software.</p>
+<p>It's sharing :) ! MirageOS does not wish to offer a monolithic solution to
+several problems but a scattered and immense ecosystem which can satisfy
+everyone in time. As I said in the introduction, Pasteur is an experiment that
+synthesizes years of work on several domains. And the crucial element to
+finally build this tiny website is basically a naive interest in doing
+everything in OCaml with unikernels :p !</p>
+<blockquote>
+<p>Just for fun!</p>
+</blockquote>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

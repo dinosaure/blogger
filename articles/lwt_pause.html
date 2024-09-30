@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteCooperation and Lwt.pause
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Cooperation and Lwt.pause</h1>
+    <ul class="tags-list"><li>OCaml</li><li>Scheduler</li><li>Community</li><li>Unikernel</li><li>Git</li></ul><p>Here's a concrete example of the notion of availability and the scheduler used
+(in this case Lwt). As you may know, at Robur we have developed a unikernel:
+<a href="https://git.robur.coop/robur/opam-mirror">opam-mirror</a>. It launches an HTTP service that can be used as an
+OPAM overlay available from a Git repository (with <code>opam repository add &lt;name&gt; &lt;url&gt;</code>).</p>
+<p>The purpose of such an unikernel was to respond to a failure of the official
+repository which fortunately did not last long and to offer decentralisation
+of such a service. You can use https://opam.robur.coop!</p>
+<p>It was also useful at the Mirage retreat, where we don't usually have a
+great internet connection. Caching packages for our OCaml users on the local
+network has benefited us in terms of our Internet bill by allowing the OCaml
+users to fetch opam packages over the local network instead of over the shared,
+metered 4G Internet conncetion.</p>
+<p>Finally, it's a unikernel that I also use on my server for my software
+<a href="https://blog.osau.re/articles/reproducible.html">reproducibility service</a> in order to have an overlay for my
+software like <a href="https://bob.osau.re/">Bob</a>.</p>
+<p>In short, I advise you to use it, you can see its installation
+<a href="https://blog.osau.re/articles/reproducible.html">here</a> (I think that in the context of a company, internally, it
+can be interesting to have such a unikernel available).</p>
+<p>However, this unikernel had a long-standing problem. We were already talking
+about it at the Mirleft retreat, when we tried to get the repository from Git,
+we had a (fairly long) unavailability of our HTTP server. Basically, we had to
+wait ~10 min before the service offered by the unikernel was available.</p>
+<h2 id="availability"><a class="anchor" aria-hidden="true" href="#availability"></a>Availability</h2>
+<p>If you follow my <a href="https://blog.osau.re/tags/scheduler.html">articles</a>, as far as Miou is concerned, from
+the outset I talk of the notion of availability if we were to make yet another
+new scheduler for OCaml 5. We emphasised this notion because we had quite a few
+problems on this subject and Lwt.</p>
+<p>In this case, the notion of availability requires the scheduler to be able to
+observe system events as often as possible. The problem is that Lwt doesn't
+really offer this approach.</p>
+<p>Indeed, Lwt offers a way of observing system events (<code>Lwt.pause</code>) but does not
+do so systematically. The only time you really give the scheduler the
+opportunity to see whether you can read or write is when you want to...
+read or write...</p>
+<p>More generally, it is said that Lwt's <strong>bind</strong> does not <em>yield</em>. In other words,
+you can chain any number of functions together (via the <code>&gt;&gt;=</code> operator), but
+from Lwt's point of view, there is no opportunity to see if an event has
+occurred. Lwt always tries to go as far down your chain as possible:</p>
+<ul>
+<li>and finish your promise</li>
+<li>or come across an operation that requires a system event (read or write)</li>
+<li>or come across an <code>Lwt.pause</code> (as a <em>yield</em> point)</li>
+</ul>
+<p>Lwt is rather sparse in adding cooperation points besides <code>Lwt.pause</code> and
+read/write operations, in contrast with Async where the bind operator is a
+cooperation point.</p>
+<h3 id="if-there-is-no-io-do-not-wrap-in-lwt"><a class="anchor" aria-hidden="true" href="#if-there-is-no-io-do-not-wrap-in-lwt"></a>If there is no I/O, do not wrap in Lwt</h3>
+<p>It was (bad<sup><a href="#fn1">1</a></sup>) advice I was given. If a function doesn't do
+I/O, there's no point in putting it in Lwt. At first glance, however, the idea
+may be a good one. If you have a function that doesn't do I/O, whether it's in
+the Lwt monad or not won't make any difference to the way Lwt tries to execute
+it. Once again, Lwt should go as far as possible. So Lwt tries to solve both
+functions in the same way:</p>
+<pre><code class="language-ocaml">val merge : int array -&gt; int array -&gt; int array
+
+let rec sort0 arr =
+  if Array.length arr &lt;= 1 then arr
+  else
+    let m = Array.length arr / 2 in
+    let arr0 = sort0 (Array.sub arr 0 m) in
+    let arr1 = sort0 (Array.sub arr m (Array.length arr - m)) in
+    merge arr0 arr1
+
+let rec sort1 arr =
+  let open Lwt.Infix in
+  if Array.length arr &lt;= 1 then Lwt.return arr
+  else
+    let m = Array.length arr / 2 in
+    Lwt.both
+      (sort1 (Array.sub arr m (Array.length arr - m)))
+      (sort1 (Array.sub arr 0 m))
+    &gt;|= fun (arr0, arr1) -&gt;
+    merge arr0 arr1
+</code></pre>
+<p>If we trace the execution of the two functions (for example, by displaying our
+<code>arr</code> each time), we see the same behaviour whether Lwt is used or not. However,
+what is interesting in the Lwt code is the use of <code>both</code>, which suggests that
+the processes are running <em>at the same time</em>.</p>
+<p>&quot;At the same time&quot; does not necessarily suggest the use of several cores or &quot;in
+parallel&quot;, but the possibility that the right-hand side may also have the
+opportunity to be executed even if the left-hand side has not finished. In other
+words, that the two processes can run <strong>concurrently</strong>.</p>
+<p>But factually, this is not the case, because even if we had the possibility of
+a point of cooperation (with the <code>&gt;|=</code> operator), Lwt tries to go as far as
+possible and decides to finish the left part before launching the right part:</p>
+<pre><code class="language-shell">$ ./a.out
+sort0: [|3; 4; 2; 1; 7; 5; 8; 9; 0; 6|]
+sort0: [|3; 4; 2; 1; 7|]
+sort0: [|3; 4|]
+sort0: [|2; 1; 7|]
+sort0: [|1; 7|]
+sort0: [|5; 8; 9; 0; 6|]
+sort0: [|5; 8|]
+sort0: [|9; 0; 6|]
+sort0: [|0; 6|]
+
+sort1: [|3; 4; 2; 1; 7; 5; 8; 9; 0; 6|]
+sort1: [|3; 4; 2; 1; 7|]
+sort1: [|3; 4|]
+sort1: [|2; 1; 7|]
+sort1: [|1; 7|]
+sort1: [|5; 8; 9; 0; 6|]
+sort1: [|5; 8|]
+sort1: [|9; 0; 6|]
+sort1: [|0; 6|]
+</code></pre>
+<hr>
+<p><strong><tag id="fn1">1</tag></strong>: However, if you are not interested in availability
+and would like the scheduler to try to resolve your promises as quickly as
+possible, this advice is clearly valid.</p>
+<h4 id="performances"><a class="anchor" aria-hidden="true" href="#performances"></a>Performances</h4>
+<p>It should be noted, however, that Lwt has an impact. Even if the behaviour is
+the same, the Lwt layer is not free. A quick benchmark shows that there is an
+overhead:</p>
+<pre><code class="language-ocaml">let _ =
+  let t0 = Unix.gettimeofday () in
+  for i = 0 to 1000 do let _ = sort0 arr in () done;
+  let t1 = Unix.gettimeofday () in
+  Fmt.pr &quot;sort0 %fs\n%!&quot; (t1 -. t0)
+
+let _ =
+  let t0 = Unix.gettimeofday () in
+  Lwt_main.run @@ begin
+    let open Lwt.Infix in
+    let rec go idx = if idx = 1000 then Lwt.return_unit
+      else sort1 arr &gt;&gt;= fun _ -&gt; go (succ idx) in
+    go 0 end;
+  let t1 = Unix.gettimeofday () in
+  Fmt.pr &quot;sort1 %fs\n%!&quot; (t1 -. t0)
+</code></pre>
+<pre><code class="language-sh">$ ./a.out
+sort0 0.000264s
+sort1 0.000676s
+</code></pre>
+<p>This is the fairly obvious argument for not using Lwt when there's no I/O. Then,
+if the Lwt monad is really needed, a simple <code>Lwt.return</code> at the very last
+instance is sufficient (or, better, the use of <code>Lwt.map</code> / <code>&gt;|=</code>).</p>
+<h4 id="cooperation-and-concrete-example"><a class="anchor" aria-hidden="true" href="#cooperation-and-concrete-example"></a>Cooperation and concrete example</h4>
+<p>So <code>Lwt.both</code> is the one to use when we want to run two processes
+&quot;at the same time&quot;. For the example, <a href="https://github.com/mirage/ocaml-git">ocaml-git</a> attempts <em>both</em> to
+retrieve a repository and also to analyse it. This can be seen in this snippet
+of <a href="https://github.com/mirage/ocaml-git/blob/a36c90404b149ab85f429439af8785bb1dde1bee/src/not-so-smart/smart_git.ml#L476-L481">code</a>.</p>
+<p>In our example with ocaml-git, the problem &quot;shouldn't&quot; appear because, in this
+case, both the left and right side do I/O (the left side binds into a socket
+while the right side saves Git objects in your file system). So, in our tests
+with <code>Git_unix</code>, we were able to see that the analysis (right-hand side) was
+well executed and 'interleaved' with the reception of objects from the network.</p>
+<h3 id="composability"><a class="anchor" aria-hidden="true" href="#composability"></a>Composability</h3>
+<p>However, if we go back to our initial problem, we were talking about our
+opam-mirror unikernel. As you might expect, there is no standalone MirageOS file
+system (and many of our unikernels don't need one). So, in the case of
+opam-mirror, we use the ocaml-git memory implementation: <code>Git_mem</code>.</p>
+<p><code>Git_mem</code> is different in that Git objects are simply stored in a <code>Hashtbl</code>.
+There is no cooperation point when it comes to obtaining Git objects from this
+<code>Hashtbl</code>. So let's return to our original advice:</p>
+<blockquote>
+<p>don't wrap code in Lwt if it doesn't do I/O.</p>
+</blockquote>
+<p>And, of course, <code>Git_mem</code> doesn't do I/O. It does, however, require the process
+to be able to work with Lwt. In this case, <code>Git_mem</code> wraps the results in Lwt
+<strong>as late as possible</strong> (as explained above, so as not to slow down our
+processes unnecessarily). The choice inevitably means that the right-hand side
+can no longer offer cooperation points. And this is where our problem begins:
+composition.</p>
+<p>In fact, we had something like:</p>
+<pre><code class="language-ocaml">let clone socket git =
+  Lwt.both (receive_pack socket) (analyse_pack git) &gt;&gt;= fun ((), ()) -&gt;
+  Lwt.return_unit
+</code></pre>
+<p>However, our <code>analyse_pack</code> function is an injection of a functor representing
+the Git backend. In other words, <code>Git_unix</code> or <code>Git_mem</code>:</p>
+<pre><code class="language-ocaml">module Make (Git : Git.S) = struct
+  let clone socket git =
+    Lwt.both (receive_pack socket) (Git.analyse_pack git) &gt;&gt;= fun ((), ()) -&gt;
+    Lwt.return_unit
+end
+</code></pre>
+<p>Composability poses a problem here because even if <code>Git_unix</code> and <code>Git_mem</code>
+offer the same function (so both modules can be used), the fact remains that one
+will always offer a certain availability to other services (such as an HTTP
+service) while the other will offer a Lwt function which will try to go as far
+as possible quite to make other services unavailable.</p>
+<p>Composing with one or the other therefore does not produce the same behavior.</p>
+<h4 id="where-to-put-lwtpause"><a class="anchor" aria-hidden="true" href="#where-to-put-lwtpause"></a>Where to put <code>Lwt.pause</code>?</h4>
+<p>In this case, our <code>analyse_pack</code> does read/write on the Git store. As far as
+<code>Git_mem</code> is concerned, we said that these read/write accesses were just
+accesses to a <code>Hashtbl</code>.</p>
+<p>Thanks to <a href="https://hannes.robur.coop/">Hannes</a>' help, it took us an afternoon to work out where we
+needed to add cooperation points in <code>Git_mem</code> so that <code>analyse_pack</code> could give
+another service such as HTTP the opportunity to work. Basically, this series of
+<a href="https://github.com/mirage/ocaml-git/pull/631/files">commits</a> shows where we needed to add <code>Lwt.pause</code>.</p>
+<p>However, this points to a number of problems:</p>
+<ol>
+<li>it is not necessarily true that on the basis of composability alone (by
+<em>functor</em> or by value), Lwt reacts in the same way</li>
+<li>Subtly, you have to dig into the code to find the right opportunities where
+to put, by hand, <code>Lwt.pause</code>.</li>
+<li>In the end, Lwt has no mechanisms for ensuring the availability of a service
+(this is something that must be taken into account by the implementer).</li>
+</ol>
+<h3 id="in-depth-knowledge-of-lwt"><a class="anchor" aria-hidden="true" href="#in-depth-knowledge-of-lwt"></a>In-depth knowledge of Lwt</h3>
+<p>I haven't mentioned another problem we encountered with <a href="https://cambium.inria.fr/~agueneau/">Armael</a> when
+implementing <a href="https://discuss.ocaml.org/t/ann-release-of-multipart-form-0-2-0/7704#memory-bound-implementation">multipart_form</a> where the use of stream meant that
+Lwt didn't interleave the two processes and the use of a <em>bounded stream</em> was
+required. Again, even when it comes to I/O, Lwt always tries to go as far as
+possible in one of two branches of a <code>Lwt.both</code>.</p>
+<p>This allows us to conclude that beyond the monad, Lwt has subtleties in its
+behaviour which may be different from another scheduler such as Async (hence the
+incompatibility between the two, which is not just of the <code>'a t</code> type).</p>
+<h3 id="digression-on-miou"><a class="anchor" aria-hidden="true" href="#digression-on-miou"></a>Digression on Miou</h3>
+<p>That's why we put so much emphasis on the notion of availability when it comes
+to Miou: to avoid repeating the mistakes of the past. The choices that can be
+made with regard to this notion in particular have a major impact, and can be
+unsatisfactory to the user in certain cases (for example, so-called pure
+calculations could take longer with Miou than with another scheduler).</p>
+<p>In this sense, we have tried to constrain ourselves in the development of Miou
+through the use of <code>Effect.Shallow</code> which requires us to always re-attach our
+handler (our scheduler) as soon as an effect is produced, unlike <code>Effect.Deep</code>
+which can re-use the same handler for several effects. In other words, and as
+we've described here, <strong>an effect yields</strong>!</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>As far as opam-mirror is concerned, we now have an unikernel that is available
+even if it attempts to clone a Git repository and save Git objects in memory. At
+least, an HTTP service can co-exist with ocaml-git!</p>
+<p>I hope we'll be able to use it at <a href="https://retreat.mirage.io/">the next retreat</a>, which I invite
+you to attend to talk more about Lwt, scheduler, Git and unikernels!</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

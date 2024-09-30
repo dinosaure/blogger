@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteHappy eyeballs?!
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Happy eyeballs?!</h1>
+    <ul class="tags-list"><li>unix</li><li>happy-eyeballs</li></ul><p>This short article will introduce the benefits of
+<a href="https://github.com/robur-coop/happy-eyeballs">happy-eyeballs</a> when it comes to connecting to a service. We'll
+see that behind a simple POSIX function, there are a lot of questions about
+latency, resource management and the method of resolving a domain name.</p>
+<p>But first of all, how do you connect to a service in OCaml? We're going to try
+to connect to amazon.com (I don't like the choice of this domain, but there's a
+technical interest behind it).</p>
+<pre><code class="language-shell">$ cat &gt;main.ml &lt;&lt;EOF
+let () =
+  let { Unix.h_addr_list; _ } = Unix.gethostbyname &quot;amazon.com&quot; in
+  if Array.length h_addr_list = 0
+  then failwith &quot;amazon.com not found&quot;;
+  let inet_addr = h_addr_list.(0) in
+  let sockaddr = Unix.ADDR_INET (inet_addr, 80) in
+  let socket =
+    Unix.socket ~cloexec:true (Unix.domain_of_sockaddr sockaddr)
+      Unix.SOCK_STREAM 0 in
+  Unix.connect socket sockaddr;
+  Format.printf &quot;Connected!\n%!&quot;;
+  Unix.close socket
+EOF
+$ ocamlopt -I +unix unix.cmxa main.ml
+$ ./a.out
+Connected!
+</code></pre>
+<p>As you can see, connecting to a service (in this case, http) is not easy. First
+we need to resolve the ‘amazon.com’ domain name with <code>gethostbyname</code>, create a
+socket (and don't forget to close it), then specify the http service (with port
+80) and try to connect. For POSIX purists, <code>getaddrinfo</code> should be used instead.</p>
+<pre><code class="language-ocaml">let () =
+  let addrs = Unix.getaddrinfo &quot;amazon.com&quot; &quot;http&quot;
+    Unix.[ AI_SOCKTYPE SOCK_STREAM ] in
+  if List.length addrs = 0
+  then failwith &quot;http service for amazon.com not found&quot;;
+  let addr = List.hd addrs in
+  let sockaddr = addr.Unix.ai_addr in
+  let socket =
+    Unix.socket ~cloexec:true (Unix.domain_of_sockaddr sockaddr)
+      Unix.SOCK_STREAM 0 in
+  Unix.connect socket sockaddr;
+  Format.printf &quot;Connected!\n%!&quot;;
+  Unix.close socket
+</code></pre>
+<p>This is where, in reality, the system does a lot of things. The first thing is
+to resolve the domain name. How does <code>gethostbyname</code>/<code>getaddrinfo</code> resolve a
+domain name?</p>
+<ul>
+<li>does it use an encryption method?</li>
+<li>does it talk to a service (a resolver) over which I have control?</li>
+<li>can anyone from the outside observe (track) this information?</li>
+</ul>
+<h2 id="domain-name-resolution"><a class="anchor" aria-hidden="true" href="#domain-name-resolution"></a>Domain Name Resolution</h2>
+<p><code>getaddrinfo</code>/<code>gethostbyname</code> are functions that interact with your system. Your
+system will then either check its cache to obtain the IP address of amazon.com,
+or ask a DNS resolver.</p>
+<p>In this case, on Archlinux (my system), <code>systemd-resolved</code> is launched. You can
+find the DNS resolver you are using (its IP address) in the <code>/etc/resolv.conf</code>
+file:</p>
+<pre><code class="language-shell">$ cat /etc/resolv.conf
+# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+# ...
+
+nameserver 127.0.0.53
+</code></pre>
+<p>This is a daemon which will itself ask another DNS resolver. Which is it?</p>
+<pre><code class="language-shell">$ resolvectl -i wlan0 dns
+Link 4 (wlan0): 89.2.0.1 89.2.0.2
+</code></pre>
+<p>This daemon is currently running to communicate with 89.2.0.1 (and 89.2.0.2).
+These resolvers were given to me by my internet box (when an IP address was
+assigned via DHCP). They are the SFR/Numericable resolvers.</p>
+<p>That's when you realise just how much infrastructure is needed behind a simple
+function! Welcome to the Tower of Babel. At this stage, we realise that we do
+not have complete control over the resolution of domain names. And, at this
+stage, you're supposed to know that such resolvers owned by big corporations are
+censoring certain services:</p>
+<pre><code class="language-sh">$ dig +short ygg.re
+$ echo &quot;This site doesn't seem to exist!?&quot;
+</code></pre>
+<p>It's at this stage that you can see the advantage of choosing your own DNS
+resolver. There are currently 2 possibilities:</p>
+<ol>
+<li>the first is to set up your own DNS resolver that synchronises with ICANN's
+servers. Although this solution has the advantage of giving you an
+uncensored Internet, it is still slow (given the locality of the servers).
+<sup><a href="#fn1">1</a></sup></li>
+<li>use an anti-censorship DNS resolver such as
+<a href="https://uncensoreddns.org">uncensoreddns.org</a></li>
+</ol>
+<pre><code class="language-shell">$ dig +short +tls ygg.re @89.233.43.71
+104.21.64.76
+172.67.178.119
+$ echo &quot;SFR lied to me!?&quot;
+</code></pre>
+<hr />
+<p><strong><tag id="fn1">1</tag></strong>: Note that we offer such a server in the form of a
+unikernel, available here. As well as being small, its attack surface is much
+smaller than that of competitors such as bind9.</p>
+<hr />
+<p>So our code from the beginning wouldn't work if we had to connect to a service
+like ygg.re. At least, it wouldn't work on some machines (including mine)
+depending on the DNS resolver used. So it might be a good idea to <em>bypass</em> the
+DNS resolver that we don't control and leave it to the user:</p>
+<ul>
+<li>use a more trusted default DNS resolver</li>
+<li>give the user the option of specifying a DNS resolver</li>
+</ul>
+<h2 id="ocaml-dns"><a class="anchor" aria-hidden="true" href="#ocaml-dns"></a>ocaml-dns</h2>
+<p>But our cooperative has already taken care of this problem by implementing the
+DNS protocol in OCaml! It should also be noted whether or not TLS is used to
+encrypt communications. In this sense, we will:</p>
+<ol>
+<li>force the use of TLS to resolve our domain names</li>
+<li>force the use of a resolver, in this case uncensoreddns.org.</li>
+</ol>
+<p><a href="https://github.com/mirage/ocaml-dns">ocaml-dns</a> offers several packages that are compatible with lwt,
+mirage or <a href="https://github.com/robur-coop/miou">miou</a>. In the air of OCaml 5, we are going to use Miou:</p>
+<pre><code class="language-ocaml">let time () = Some (Ptime_clock.now ())
+
+let ygg_re = Domain_name.(host_exn (of_string_exn &quot;ygg.re&quot;))
+
+let failwith_error_msg = function
+  | Ok value -&gt; value
+  | Error (`Msg msg) -&gt; failwith msg
+
+let uncensoreddns_org =
+  let ipaddr = Ipaddr.of_string_exn &quot;89.233.43.71&quot; in
+  let authenticator = X509.Authenticator.of_string
+    &quot;key-fp:SHA256:INSZEZpDoWKiavosV2/xVT8O83vk/RRwS+LTiL+IpHs=&quot; in
+  let authenticator = failwith_error_msg authenticator in
+  let authenticator = authenticator time in
+  let tls = Result.get_ok (Tls.Config.client ~authenticator ()) in
+  `Tls (tls, ipaddr, 853)
+
+let pp_sockaddr ppf = function
+  | Unix.ADDR_INET (inet_addr, port) -&gt;
+      Fmt.pf ppf &quot;%s:%d&quot; (Unix.string_of_inet_addr inet_addr) port
+  | Unix.ADDR_UNIX str -&gt; Fmt.pf ppf &quot;&lt;%s&gt;&quot; str
+
+let () =
+  Miou_unix.run @@ fun () -&gt;
+  let rng = Mirage_crypto_rng_miou_unix.(initialize (module Pfortuna)) in
+  let daemon, he = Happy_eyeballs_miou_unix.create () in
+  let dns = Dns_client_miou_unix.create
+    ~nameservers:(`Tcp, [ uncensoreddns_org ]) he in
+  let result = Dns_client_miou_unix.gethostbyname dns ygg_re in
+  let ipaddr = failwith_error_msg result in
+  let inet_addr = Ipaddr_unix.to_inet_addr (Ipaddr.V4 ipaddr) in
+  let sockaddr = Unix.ADDR_INET (inet_addr, 80) in
+  let socket = Unix.socket ~cloexec:true
+    (Unix.domain_of_sockaddr sockaddr) Unix.SOCK_STREAM 0 in
+  Unix.connect socket sockaddr;
+  Format.printf &quot;Connected to %a!\n%!&quot; pp_sockaddr sockaddr;
+  Unix.close socket;
+  Happy_eyeballs_miou_unix.kill daemon;
+  Mirage_crypto_rng_miou_unix.kill rng
+</code></pre>
+<p>The code immediately becomes a little more complex. We're deliberately not going
+to talk about happy-eyeballs yet. However, it is interesting to note that
+certain processes are expected for DNS and TLS. Particularly the generation of
+random numbers.</p>
+<p>We're not going to disgress here and yet, as far as cryptography is concerned,
+having control (as is the case here) over the way random numbers are generated
+is fundamental. This <a href="https://mirage.io/blog/mirage-entropy">very good article</a> gives a good overview of the
+importance of this line<sup><a href="#fn2">2</a></sup>:</p>
+<pre><code class="language-ocaml">let () =
+  Miou_unix.run @@ fun () -&gt;
+  let rng = Mirage_crypto_rng_miou_unix.(initialize (module Pfortuna)) in
+
+</code></pre>
+<hr />
+<p><strong><tag id="fn2">2</tag></strong>: It's worth noting that <code>Pfortuna</code>, which was
+developed as part of Miou, is the only one to be <strong>domain-safe</strong> - which makes
+it all the more difficult to tell the difference between a ‘good’ random number
+and the result of a data-race!</p>
+<hr />
+<p>We can now compile and test the code!</p>
+<pre><code class="language-ocaml">$ ocamlfind opt -linkpkg \
+  -package digestif.c,ptime.clock.os,dns-client-miou-unix,mirage-crypto-rng-miou-unix \
+  main.ml
+$ ./a.out
+Connected to 104.21.64.76:80!
+</code></pre>
+<h2 id="multiple-solutions"><a class="anchor" aria-hidden="true" href="#multiple-solutions"></a>Multiple solutions!</h2>
+<p>At this stage, we have just protected our possible user by forcing the use of
+TLS for DNS resolution and at the same time avoided censorship by forcing the
+use of a DNS resolver that we trust rather than the one imposed by our ISP.</p>
+<p>However, if we go back to the code from the very beginning, there's another
+question that arises and it specifically concerns the result of our resolution
+and the <code>connect()</code> function. Let's go back to the original amazon.com code and
+run some benchmarks!</p>
+<pre><code class="language-ocaml">let pp_sockaddr ppf = function
+  | Unix.ADDR_INET (inet_addr, port) -&gt;
+      Format.fprintf ppf &quot;%s:%d&quot; (Unix.string_of_inet_addr inet_addr) port
+  | Unix.ADDR_UNIX str -&gt; Format.fprintf ppf &quot;&lt;%s&gt;&quot; str
+
+let () =
+  let addrs = Unix.getaddrinfo &quot;amazon.com&quot; &quot;http&quot;
+    Unix.[ AI_SOCKTYPE SOCK_STREAM ] in
+  if List.length addrs = 0
+  then failwith &quot;http service for amazon.com not found&quot;;
+  List.iter (fun addr -&gt; Format.printf &quot;- %a\n%!&quot;
+    pp_sockaddr addr.Unix.ai_addr)
+    addrs;
+  let addr = List.hd addrs in
+  let sockaddr = addr.Unix.ai_addr in
+  let socket = Unix.socket ~cloexec:true (Unix.domain_of_sockaddr sockaddr)
+    Unix.SOCK_STREAM 0 in
+  let t0 = Unix.gettimeofday () in
+  Unix.connect socket sockaddr;
+  let t1 = Unix.gettimeofday () in
+  Format.printf &quot;Connected to %a (in %fs)!\n%!&quot; pp_sockaddr sockaddr
+    (t1 -. t0);
+  Unix.close socket
+</code></pre>
+<p>Here we're not only going to show our different solutions after solving
+amazon.com, but also monitor the time taken to make our <code>connect()</code>:</p>
+<pre><code class="language-shell">$ ./a.out
+- 54.239.28.85:80
+- 52.94.236.248:80
+- 205.251.242.103:80
+Connected to 54.239.28.85:80 (in 0.085934s)!
+</code></pre>
+<p>Note that if you re-execute our code, the IP address chosen is no longer the
+same as the previous one. It is said that amazon.com uses <a href="https://en.wikipedia.org/wiki/Round-robin_DNS">Round-Robin
+DNS</a>, a technique that is not recommended. However, it is ‘normal’ for a
+service to offer several IPs. As a general rule, the IPs given are those that
+are closest geographically speaking:</p>
+<pre><code class="language-shell">$ dig +short google.com @8.8.8.8
+142.250.179.78
+$ dig +short +tls google.com @89.233.43.71
+142.250.74.110
+$ dig +short google.com @89.2.0.1
+142.250.201.174
+</code></pre>
+<p>So there's another question: how do you choose the right IP? The main factor
+that will determine our choice is the connection time. We have to admit that
+even if we manipulate ideas and concepts, there is always a material reality to
+what we do and use!</p>
+<pre><code class="language-shell">$ cat &gt;main.ml &lt;&lt;EOF
+let pp_sockaddr ppf = function
+  | Unix.ADDR_INET (inet_addr, port) -&gt;
+      Format.fprintf ppf &quot;%s:%d&quot; (Unix.string_of_inet_addr inet_addr) port
+  | Unix.ADDR_UNIX str -&gt; Format.fprintf ppf &quot;&lt;%s&gt;&quot; str
+
+let () =
+  let inet_addr = Unix.inet_addr_of_string Sys.argv.(1) in
+  let sockaddr = Unix.ADDR_INET (inet_addr, 80) in
+  let socket = Unix.socket ~cloexec:true (Unix.domain_of_sockaddr sockaddr)
+    Unix.SOCK_STREAM 0 in
+  let t0 = Unix.gettimeofday () in
+  Unix.connect socket sockaddr;
+  let t1 = Unix.gettimeofday () in
+  Format.printf &quot;Connected to %a (in %fs)!\n%!&quot; pp_sockaddr sockaddr
+    (t1 -. t0);
+  Unix.close socket
+EOF
+$ ocamlopt -I +unix unix.cmxa main.ml
+$ ./a.out 142.250.179.78
+Connected to 142.250.179.78:80 (in 0.008921s)!
+$ ./a.out 142.250.201.174
+Connected to 142.250.201.174:80 (in 0.008082s)!
+$ ./a.out 142.250.74.110
+Connected to 142.250.74.110:80 (in 0.036401s)!
+</code></pre>
+<p>Our first solutions are still 4 times faster than our latest solution! For an
+application that attempts several connections (such as chatting with an API),
+this can be a real performance factor.</p>
+<p>Here, the question has arisen for all our solutions in relation to the
+google.com service, but the same question arises for amazon.com. Fortunately,
+the 3 servers that amazon.com gives us are located in the same place (Ashburn).
+But, even if the geographical location of a server is a determining factor in
+the <code>connect()</code> time, other factors may come into play, such as the load on the
+first server, which could take longer to respond than the second.</p>
+<p>In truth, the only solution that seems reasonable is a kind of <code>connect()</code>
+competition on these multiple solutions. As soon as one of the three finishes,
+the others should be <em>cancelled</em>.</p>
+<h2 id="happy-eyeballs"><a class="anchor" aria-hidden="true" href="#happy-eyeballs"></a>Happy-eyeballs!</h2>
+<p>This is where happy-eyeballs comes in! The idea behind happy-eyeballs is simple:
+it consists of performing DNS resolution and attempting several competing
+connections. The first (at speed) to establish a connection with the service
+will be returned to you, while the others will have to be cancelled cleanly
+(including closing the allocated sockets).</p>
+<p>This resolution and connection process should run <em>in the background</em>. This way,
+the user would just have to give it the task of connecting to a specific service
+and happy-eyeballs would compete in the background until there was, at least, an
+established connection that it would return to you.</p>
+<pre><code class="language-ocaml">let time () = Some (Ptime_clock.now ())
+
+let ygg_re = Domain_name.(host_exn (of_string_exn &quot;ygg.re&quot;))
+
+let failwith_error_msg = function
+  | Ok value -&gt; value
+  | Error (`Msg msg) -&gt; failwith msg
+
+let uncensoreddns_org =
+  let ipaddr = Ipaddr.of_string_exn &quot;89.233.43.71&quot; in
+  let authenticator = X509.Authenticator.of_string
+    &quot;key-fp:SHA256:INSZEZpDoWKiavosV2/xVT8O83vk/RRwS+LTiL+IpHs=&quot; in
+  let authenticator = failwith_error_msg authenticator in
+  let authenticator = authenticator time in
+  let tls = Result.get_ok (Tls.Config.client ~authenticator ()) in
+  `Tls (tls, ipaddr, 853)
+
+let getaddrinfo dns record domain_name = match record with
+  | `A -&gt;
+    Dns_client_miou_unix.gethostbyname dns domain_name
+    |&gt; Result.map (fun ipv4 -&gt; Ipaddr.(Set.singleton (V4 ipv4)))
+  | `AAAA -&gt;
+    Dns_client_miou_unix.gethostbyname6 dns domain_name
+    |&gt; Result.map (fun ipv6 -&gt; Ipaddr.(Set.singleton (V6 ipv6)))
+
+let () =
+  Miou_unix.run @@ fun () -&gt;
+  let rng = Mirage_crypto_rng_miou_unix.(initialize (module Pfortuna)) in
+  let daemon, he = Happy_eyeballs_miou_unix.create () in
+  let dns = Dns_client_miou_unix.create
+    ~nameservers:(`Tcp, [ uncensoreddns_org ]) he in
+  Happy_eyeballs_miou_unix.inject he (getaddrinfo dns);
+  begin match Happy_eyeballs_miou_unix.connect he &quot;ygg.re&quot; [ 443; 80 ] with
+  | Ok ((ipaddr, port), socket) -&gt;
+    Fmt.pr &quot;Connected to %a:%d\n%!&quot; Ipaddr.pp ipaddr port;
+    Miou_unix.close socket
+  | Error (`Msg err) -&gt;
+    Fmt.epr &quot;Got an error: %s&quot; err end;
+  Happy_eyeballs_miou_unix.kill daemon;
+  Mirage_crypto_rng_miou_unix.kill rng
+</code></pre>
+<p>We can now compile and test the code!</p>
+<pre><code class="language-shell">$ ocamlfind opt -linkpkg \
+  -package digestif.c,ptime.clock.os,dns-client-miou-unix,mirage-crypto-rng-miou-unix \
+  main.ml
+$ ./a.out
+Connected to 104.21.64.76:443
+</code></pre>
+<p>It seems that one solution is much preferred over another in the choice of IPs.
+Once again, the reasons for this choice, which revolves around connection speed,
+can be found in a number of areas (geolocation, load, etc.).</p>
+<p>But we did it! I hope you'll find <code>connect()</code> a bit more tedious than usual and
+turn to better solutions like happy-eyeballs.</p>
+<h3 id="ports"><a class="anchor" aria-hidden="true" href="#ports"></a>Ports</h3>
+<p>There is a slight difference to be made about the ports. As you can see, it is
+possible to specify several ports for our service. In our case, we have
+specified 80 (http) and 443 (https). Depending on which is the most responsive,
+we can use pattern-matching to initiate a simple http connection or an https
+connection (tcp + tls).</p>
+<p>In my opinion, it is not advisable to leave the choice of secure or insecure
+communication solely to the connection speed parameter.</p>
+<p>However, there are many cases where we would like to try several ports in order
+to talk to similar services. Recently, the question arose for SMTP where:</p>
+<ul>
+<li>port 465 is not standard but offers fully encrypted SMTP communication</li>
+<li>port 587 is standard but only offers STARTTLS encryption</li>
+</ul>
+<p>In addition, trying both, one of which is not specified but is generally
+offered, is a good solution and only the happy-eyeballs solution could
+satisfy me.</p>
+<h3 id="connect-can-hangs"><a class="anchor" aria-hidden="true" href="#connect-can-hangs"></a><code>connect()</code> can <em>hangs</em></h3>
+<p>Another, more subtle problem with <code>connect()</code> concerns the TCP protocol. The TCP
+protocol can attempt to communicate with a service. It should be noted that you
+will make several attempts to establish a connection with the service up to a
+certain point, which depends on the system. In this case, for Linux, it says:</p>
+<blockquote>
+<p><strong>tcp_retries2</strong> (integer; default: 15; since Linux 2.2)</p>
+<p>The maximum number of times a TCP packet is retransmitted in established
+state before giving up. The default value is 15, which corresponds to a
+duration of approximately between 13 to 30 minutes, depending on the
+retransmission timeout. The RFC 1122 specified minimum limit of 100 seconds
+is typically deemed too short.</p>
+</blockquote>
+<p>In the case of Miou, where <code>Miou_unix.connect</code> is asynchronous, this might not
+pose too much of a problem. However, having a resource alive for 30min can end
+up with an accumulation of several sockets waiting to finish the <code>connect()</code> and
+can end up with an EMFILE (too many allocated sockets).</p>
+<p>This is why it is often advisable to associate a timer with a <code>connect()</code> limit
+(in our case, 5sec) to avoid this situation.</p>
+<pre><code class="language-ocaml">let connect socket sockaddr =
+  let exception Timeout in
+  let resource = Miou_unix.Ownership.resource socket in
+  let prm0 = Miou.async @@ fun () -&gt; Miou_unix.sleep 5.; raise Timeout in
+  let prm1 = Miou.async ~give:[ resource ] @@ fun () -&gt;
+    Miou_unix.Ownership.connect socket sockaddr;
+    Miou.Ownership.transfer resource in
+  Miou.await_first [ prm0; prm1 ] |&gt; function
+  | Ok () -&gt; Some socket
+  | Error Timeout -&gt; None
+  | Error exn -&gt; raise exn
+
+let () =
+  Miou_unix.run @@ fun () -&gt;
+  let addrs = Unix.getaddrinfo &quot;google.com&quot; &quot;http&quot;
+    Unix.[ AI_SOCKTYPE SOCK_STREAM ] in
+  if List.length addrs = 0
+  then failwith &quot;http service for amazon.com not found&quot;;
+  let addr = List.hd addrs in
+  let socket = Miou_unix.Ownership.tcpv4 () in
+  match connect socket addr.Unix.ai_addr with
+  | Some socket -&gt; Miou_unix.Ownership.close socket
+  | None -&gt; ()
+</code></pre>
+<h2 id="getaddrinfo"><a class="anchor" aria-hidden="true" href="#getaddrinfo"></a><code>getaddrinfo()</code></h2>
+<p>The <code>getaddrinfo</code> function is a bit mystical. In particular, it's what
+introduced me to the <code>/etc/services</code> file. A file containing an association of
+services with protocols (tcp or udp) and ports. This means above all that,
+depending on the system, the use of <code>getaddrinfo</code> may differ. The alignment
+between the service, the IP address and the port in order to return a convincing
+result with a <code>connect()</code> can sometimes be... <a href="https://jvns.ca/blog/2022/02/23/getaddrinfo-is-kind-of-weird/">surprising</a>!</p>
+<h2 id="ipv4--ipv6"><a class="anchor" aria-hidden="true" href="#ipv4--ipv6"></a>IPv4 &amp; IPv6</h2>
+<p>One of the problems that has been noted during the transition from IPv4 to IPv6
+is the repeated attempts to reach an IPv6 destination that only fail, taking the
+user back to an IPv4 destination with a considerable delay (IPv6 brokeness).
+There are several solutions to solve this problem (notably at DNS level) but
+happy-eyeballs was a solution that helped to eliminate this problem.</p>
+<p>The reader might point out that in 2024 almost everything will be IPv6, but
+that's still not the case for me. My (dinosaure) ISP doesn't make IPv6 available
+in my case, so happy-eyeballs may be more than necessary in my case to avoid
+IPv6 brokeness.</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>Behind a simple syscall, a lot can happen. Failing to understand, in detail,
+what can happen with <code>gethostbyname</code>/<code>getaddrinfo</code> and <code>connect</code> are pitfalls
+that only make you lose control over the tool you use every day.</p>
+<p>Since, in <a href="https://robur.coop/">our cooperative</a>, we develop unikernels, these questions
+must arise as we don't have all these functions for free and have to reimplement
+them in OCaml (which is always better than C!).</p>
+<p>However, even if these solutions are developed within the framework of
+unikernels, we still attach importance to making these solutions available even
+to those who do not develop unikernels. In short, follow us and our work.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rdf:RDF xmlns="http://purl.org/rss/1.0/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <channel rdf:about="https://blog.osau.re/rss1.xml">
+    <title>The dinosaure&apos;s blog</title>
+    <link>https://blog.osau.re/</link>
+    <description><![CDATA[My personnal blog about MirageOS & OCaml]]></description>
+    <items>
+      <rdf:Seq>
+        <rdf:li resource="https://blog.osau.re//articles/happy_eyeballs.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/lwt_pause.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/miou_rules.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/miou.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/mirageos_retreat.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/smtp_3.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/smtp_2.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/smtp_1.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/reproducible.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/gadt_and_state_machine.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/spoke.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/esperanto.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/pasteur.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/optint.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/blog_requiem.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/blog.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/release_cycle_email.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/eqaf_release.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/tuyau.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/functor_magic.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/mirageos_compilation.html"/>
+        <rdf:li resource="https://blog.osau.re//articles/hello_world.html"/>
+      </rdf:Seq>
+    </items>
+  </channel>
+  <item rdf:about="https://blog.osau.re//articles/happy_eyeballs.html">
+    <title>Happy eyeballs?!</title>
+    <link>https://blog.osau.re//articles/happy_eyeballs.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/lwt_pause.html">
+    <title>Cooperation and Lwt.pause</title>
+    <link>https://blog.osau.re//articles/lwt_pause.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/miou_rules.html">
+    <title>Rules of Miou!</title>
+    <link>https://blog.osau.re//articles/miou_rules.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/miou.html">
+    <title>Miou, a simple scheduler for OCaml 5</title>
+    <link>https://blog.osau.re//articles/miou.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/mirageos_retreat.html">
+    <title>The MirageOS retreat (01/05/2023)</title>
+    <link>https://blog.osau.re//articles/mirageos_retreat.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/smtp_3.html">
+    <title>Deploy an SMTP service (3/3)</title>
+    <link>https://blog.osau.re//articles/smtp_3.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/smtp_2.html">
+    <title>Deploy an SMTP service (2/3)</title>
+    <link>https://blog.osau.re//articles/smtp_2.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/smtp_1.html">
+    <title>Deploy an SMTP service (1/3)</title>
+    <link>https://blog.osau.re//articles/smtp_1.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/reproducible.html">
+    <title>Reproducibility!</title>
+    <link>https://blog.osau.re//articles/reproducible.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/gadt_and_state_machine.html">
+    <title>GADTs and state machine</title>
+    <link>https://blog.osau.re//articles/gadt_and_state_machine.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/spoke.html">
+    <title>Spoke, how to implement a little cryptographic protocol</title>
+    <link>https://blog.osau.re//articles/spoke.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/esperanto.html">
+    <title>Esperanto, when OCaml meets Cosmopolitan</title>
+    <link>https://blog.osau.re//articles/esperanto.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/pasteur.html">
+    <title>Pasteur is up!</title>
+    <link>https://blog.osau.re//articles/pasteur.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/optint.html">
+    <title>optint, 32-bits, 64-bits architecture and optimization</title>
+    <link>https://blog.osau.re//articles/optint.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/blog_requiem.html">
+    <title>Again, re-update of my blog after 2 years.</title>
+    <link>https://blog.osau.re//articles/blog_requiem.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/blog.html">
+    <title>All the way down, my blog is re-up!</title>
+    <link>https://blog.osau.re//articles/blog.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/release_cycle_email.html">
+    <title>Release cycle about SMTP stack</title>
+    <link>https://blog.osau.re//articles/release_cycle_email.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/eqaf_release.html">
+    <title>Eq(af), timing attack!</title>
+    <link>https://blog.osau.re//articles/eqaf_release.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/tuyau.html">
+    <title>Tuyau, the next conduit</title>
+    <link>https://blog.osau.re//articles/tuyau.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/functor_magic.html">
+    <title>Functor, Application and magick!</title>
+    <link>https://blog.osau.re//articles/functor_magic.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/mirageos_compilation.html">
+    <title>MirageOS compilation</title>
+    <link>https://blog.osau.re//articles/mirageos_compilation.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+  <item rdf:about="https://blog.osau.re//articles/hello_world.html">
+    <title>Hello World!</title>
+    <link>https://blog.osau.re//articles/hello_world.html</link>
+    <description><![CDATA[no description]]></description>
+  </item>
+</rdf:RDF>

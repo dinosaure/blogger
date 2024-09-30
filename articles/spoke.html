@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteSpoke, how to implement a little cryptographic protocol
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Spoke, how to implement a little cryptographic protocol</h1>
+    <ul class="tags-list"><li>OCaml</li><li>Cryptography</li><li>Protocol</li><li>MirageOS</li></ul><p>I recently discovered <a href="https://en.wikipedia.org/wiki/Password-authenticated_key_agreement">PAKE for Password-Authenticated Key Agreement</a>. It
+is a method of initiating a secure connection based on a password known between
+the two people. The key thing to remember here is that the password will never
+be disclosed to an attacker through the protocol. A known algorithm is used to
+derive a strong shared key from this password.</p>
+<p>Of course, to perform this derivation, we still need to share some information.
+This is where a feature of the protocol must be ensured: transmitted
+information between Alice &amp; Bob must &quot;look&quot; like random content.</p>
+<p>Indeed, an attacker can recognise the content (this chunk looks suspiciously
+like something used by a well-known  protocol), they can also recognise the
+algorithm behind - and they can attempt a brute-force attack of some weak
+passwords to regenerate the exchanged chunks.</p>
+<p>The exchange must therefore seem random, but it is determined - so that both
+parties can finally agree on a strong shared key. Then, from the latter, a
+protocol can be established using a symmetric cryptographic method such as
+<a href="https://en.wikipedia.org/wiki/Galois/Counter_Mode">GCM</a> or <a href="https://www.rfc-editor.org/rfc/rfc7539.html">ChaCha20 Poly1305</a>.</p>
+<hr />
+<p><strong>Disclaimer</strong>: All the code in this article is for illustrative purposes, a
+copy/paste will probably not work and I have deliberately omitted some details
+to make it easier to read. The code should therefore be understandable and this
+can be a good opportunity to read an implementation (as I usually do) without
+referring to its interface.</p>
+<hr />
+<h2 id="spake2ee"><a class="anchor" aria-hidden="true" href="#spake2ee"></a>SPAKE2+EE</h2>
+<p>There are quite a few implementations of PAKE with subtleties, other guarantees
+and specific contexts of use. During my research, the one that interested me
+the most was SPAKE2+EE which is similar to SPAKE2+ (for which an <a href="https://tools.ietf.org/id/draft-bar-cfrg-spake2plus-00.html">RFC</a>
+is being written) but with a small variation that allows us to no longer
+require necessary constants during the exchange between Alice &amp; Bob: indeed, if
+you look into SPAKE2+, it requires to fix 2 element <code>M</code> and <code>N</code> in the
+primer-order subgroup of a group <code>G</code> in which <a href="https://en.wikipedia.org/wiki/Computational_Diffie%E2%80%93Hellman_assumption">CDH problem is hard</a>.</p>
+<p>Unfortunately, I am not a crypto-guy and it is certainly difficult for me to go
+into details about the security of SPAKE2+ and SPAKE2+EE. However, my research
+started with <a href="https://moderncrypto.org/mail-archive/curves/2015/000424.html">this resource</a> which, in my opinion, explains well the
+difference between these two protocols.</p>
+<p>For more information about <a href="https://elligator.cr.yp.to/">Elligator 2</a> (the EE of SPAKE2+EE, the
+Elligator Edition), the idea is to allow group elements to be serialized in a
+way that is indistinguishable from uniformly random strings of the same size.
+This ensures that it is difficult to recognise, from the point of view of an
+attacker, the true meaning of the information exchanged between Alice and Bob.</p>
+<p>In this respect, this protocol seems to be very interesting to initiate a
+secure connection from a weak password. We will see here how:</p>
+<ol>
+<li>implement what are called cryptographic primitives</li>
+<li>implement the handshake</li>
+<li>how we end up with a protocol implementation like <code>Mirage_flow.S</code> for ease
+of use</li>
+</ol>
+<h2 id="primitives"><a class="anchor" aria-hidden="true" href="#primitives"></a>Primitives</h2>
+<p>Of course, the first step in implementing our protocol are the cryptographic
+primitives. We are talking about &quot;primitives&quot; here because it only consists in
+doing some very complicated calculations and getting a result.</p>
+<p>From the experience we have with <a href="https://github.com/mirage/mirage-crypto">mirage-crypto</a> but also
+<a href="https://github.com/mirage/digestif">digestif</a>, implementing cryptographic primitives in OCaml remains a
+non-option as far as performance is concerned because it is essentially about
+manipulating uniform arrays containing <code>uint32</code> or <code>uint64</code>. Even if OCaml
+(flambda?) can optimise this kind of code, C (unfortunately) remains the best
+option as far as expressiveness and performance is concerned - indeed, we
+wouldn't want the GC to intervene in the middle of a computation...</p>
+<p>However, C is still very bad at one thing: allocation and, as far as OCaml is
+concerned, interaction between C and the OCaml GC - this is where errors are
+most common. So our design is to let OCaml allocates, go into the C world to do
+the calculations on what has already been allocated, and then come back into
+the OCaml world without us having made a single side-effect.</p>
+<pre><code class="language-ocaml">external xor_into
+  : string -&gt; src_off:int -&gt; bytes -&gt; dst_off:int -&gt; len:int -&gt; unit
+  = &quot;caml_xor_into&quot; [@@noalloc]
+
+let xor str0 str1 =
+  let len = min (String.length str0) (String.length str1) in
+  let buf = Bytes.of_string (String.sub str1 0 len) (* allocation *) in
+  xor_into str0 ~src_off:0 buf ~dst_off:0 ~len ;
+  Bytes.unsafe_to_string buf
+  (* [buf] has been allocated locally and never been shared, thus it is safe to
+     treat it as string before returning. *)
+</code></pre>
+<pre><code class="language-c">static inline void xor_into (const uint8_t *src, uint8_t *dst, size_t n) {
+#ifdef ARCH_SIXTYFOUR
+  uint64_t s;
+  for (; n &gt;= 8; n -= 8, src += 8, dst += 8)
+    *(uint64_t*) dst ^= *(uint64_t*)memcpy(&amp;s, src, 8);
+#endif
+
+  uint32_t t;
+  for (; n &gt;= 4; n -= 4, src += 4, dst += 4)
+    *(uint32_t*) dst ^= *(uint32_t*)memcpy(&amp;t, src, 4);
+
+  for (; n --; ++ src, ++ dst) *dst = *src ^ *dst;
+}
+
+#define Bytes_off(buf, off) ((uint8_t*) Bytes_val (buf) + Long_val (off))
+#define String_off(str, off) ((uint8_t*) String_val (str) + Long_val (off))
+
+CAMLprim value
+caml_xor_into (value src, value src_off, value dst, value dst_off, value len) {
+  xor_into (String_off (src, src_off),
+            Bytes_off (dst, dst_off),
+            Long_val (len));
+  return Val_unit;
+}
+</code></pre>
+<p>This small code shows the design that takes place mostly within mirage-crypto
+and digestif. As you can see, the allocation is on the caml side. This allows
+us to tag our C function with <code>[@@noalloc]</code> (and avoid the generation of the
+ceremony necessary to pass from the C world to the Caml world by the compiler)
+<sup><a href="#fn1">1</a></sup>. It also allows us to take only what is interesting in the
+C world, the computation - that's all we do. Embedding all this in a nice API
+shows us what I think is the best thing about OCaml: hiding ugly things behind
+a nice interface with much more interesting expressiveness than C.</p>
+<hr />
+<p><tag id="fn1"><strong>1</strong></tag>: We can go even further, since it can be a
+side-effect-free calculation, we can notify the GC that this function can
+run in parallel with other caml code. Indeed, if the calculation takes place in
+a &quot;bigarray&quot;, it means above all that this array will never move (by the GC)
+and therefore we can &quot;release&quot; the GC lock. This is what was done for
+<a href="https://github.com/mirage/digestif/blob/fc510e57bbb27ceb020ca73b1067e79a1b933f47/src-c/native/stubs.c#L42-L56">digestif</a> - so it is possible to really run a thread in
+(true) parallel to compute a hash to something else.</p>
+<hr />
+<p>Back to SPAKE2+EE, we need some primitives which we will get from
+<a href="https://github.com/jedisct1/libsodium">libsodium</a>. We'll do the bindings by hand as for <code>xor_into</code>:</p>
+<pre><code class="language-ocaml">external ed25519_from_uniform
+  : bytes -&gt; dst_off:int -&gt; string -&gt; src_off:int -&gt; unit
+external ed25519_scalarmult_base
+  : bytes -&gt; dst_off:int -&gt; string -&gt; src_off:int -&gt; unit
+external ed25519_add
+  : bytes -&gt; dst_off:int -&gt; string -&gt; string -&gt; unit
+external ed25519_sub
+  : bytes -&gt; dst_off:int -&gt; string -&gt; string -&gt; unit
+external ed25519_scalarmult
+  : bytes -&gt; string -&gt; src_off:int -&gt; point:string -&gt; bool
+</code></pre>
+<h2 id="spake2ee-handshake-higher-primitives"><a class="anchor" aria-hidden="true" href="#spake2ee-handshake-higher-primitives"></a>SPAKE2+EE handshake, higher primitives</h2>
+<p>Let's start with a step-by-step explanation of SPAKE2+EE.</p>
+<p>Let <code>G</code> be a group in which the computational Diffie-Hellman problem is hard.
+Suppose <code>G</code> has order <code>p*h</code> where <code>p</code> is a large prime; <code>h</code> will be called
+the cofactor. We fix a generate <code>P</code> of (large) prime-order subgroup of <code>G</code>.
+More concretely, <code>x * P = ed25519_scalarmult_base(x)</code>. <code>KDF</code> is a key
+derivation function that take our password (and a <em>salt</em>) and it generates
+few values: <code>m</code>, <code>n</code>, <code>k</code> and <code>l</code>. Finally, <code>E</code> maps a 32-bytes vector to a
+point of which it is guaranteed to be on the main subgroup <code>G</code>.</p>
+<p>Alice starts to generate our <em>salt</em> and retransmit it to Bob to let him to
+regenerate <code>m</code>, <code>n</code>, <code>k</code> and <code>l</code> with the shared password. This will be our
+first <em>packet</em>. This may contain more information such as the algorithm used by
+our <code>KDF</code> function. We can also take the opportunity to specify at this point
+the symmetric encryption algorithms that will be used later.</p>
+<p>Bob selects <code>x</code> uniformly at random, computes the public share <code>X</code>, and
+transmits it to Alice. More concretely, <code>X</code> will be generate with:</p>
+<pre><code class="language-ocaml">let bob () =
+  let x = random () in
+  let gx = ed25519_scalarmult_base x in
+  let _X = ed25519_add gx (ed25519_from_uniform m) in
+  send _X
+</code></pre>
+<p>Upon receipt of <code>X</code>, Alice checks the received element for group membership and
+aborts if <code>X</code> is not in the large prime-order subgroup of <code>G</code>. We do this check
+<em>via</em> <code>ed25519_scalarmult</code> which returns a <code>bool</code>. Alice then selects <code>y</code>
+uniformly at random, computes the public share <code>Y</code>, and transmits it to the
+Bob:</p>
+<pre><code class="language-ocaml">let alice _X =
+  let _L = ed25519_scalarmult_base l in
+  let y = random () in
+  let gy = ed25519_scalarmult_base y in
+  let _Y = ed25519_add gy (ed25519_from_uniform n) in
+  let gx = ed25519_sub _X (ed25519_from_uniform m) in
+  let _Z = scalar () and _V = scalar () in
+  (* [scalar] allocates a zero-ed buffer which can be use
+     by [ed25519_scalarmult_into] then. *)
+  if ed25519_scalarmult_into _Z y gx = true
+  &amp;&amp; ed25519_scalarmult_into _V y _L = true
+  then send _Y
+  else abort
+</code></pre>
+<p>Upon receipt of <code>Y</code>, Bob checks the received element for group membership and
+aborts if <code>Y</code> is not in the large prime-order subgroup of <code>G</code>:</p>
+<pre><code class="language-ocaml">let bob _Y =
+  let gy = ed25519_sub _Y (ed25519_from_uniform n)
+  if ed25519_scalarmult_into _Z x gy = false
+  || ed25519_scalarmult_into _V l gy = false
+  then abort
+</code></pre>
+<p>Below, you can see all the steps described and what is transmitted. If
+everything went well, at the end, we can generate a strong key (with our
+function <code>H</code>) using <code>X</code>, <code>Y</code> (which have been on the network), <code>k</code> (which is
+known only to Bob and Alice), <code>Z</code>, <code>V</code> (which have been calculated):</p>
+<pre><code class="language-shell">                  Bob                   |                 Alice               
+                                        |
+                                        | salt &lt;- random()
+                                        | m, n, k, l = KDF(password, salt)
+                                        |
+                               &lt;= transmit salt &lt;=
+                                        |
+       m, n, k, l = KDF(password, salt) |
+                          x &lt;- random() |
+                            g^x = x * P |
+                     X = g^x + h * E(m) |
+                                        |
+                                =&gt; transmit X =&gt;
+                                        |
+                                        | L = l * P
+                                        | y &lt;- random()
+                                        | g^y = y * P
+                                        | Y = g^y + h * E(n)
+                                        | g^x = x - (h * E(m))
+                                        | Z = h * y * g^x
+                                        | V = h * y * L
+                                        |
+                                &lt;= transmit Y &lt;=
+                                        |
+                   g^y = Y - (h * E(n)) |
+                        Z = h * x * g^y |
+                        V = h * l * g^y |
+                                        |
+                              sk = H(X, Y, Z, k, V)
+</code></pre>
+<h3 id="serialization--de-serialization-and-isomorphism"><a class="anchor" aria-hidden="true" href="#serialization--de-serialization-and-isomorphism"></a>Serialization / de-serialization and isomorphism</h3>
+<p>Throughout the process, information such as <code>m</code>, <code>n</code>, <code>l</code> and <code>k</code> must be kept.
+This information may be stored into a database. Such use cases require the
+ability to serialise and deserialise this information.</p>
+<p>More specifically, as we have said, the first packet can (and should) contain
+much more than just the <code>salt</code>, it should also contain information such as the
+<code>KDF</code> function used. Alice's first operation is therefore:</p>
+<ol>
+<li>generate this &quot;public&quot; packet which will be forwarded to Bob</li>
+<li>generate an easily serialized/deserialized value to be able to manipulate it
+throughout the handshake, a &quot;secret&quot; value</li>
+</ol>
+<pre><code class="language-ocaml">type 'k aead =
+  | GCM : Mirage_crypto.Cipher_block.AES.GCM.key aead
+  | ChaCha20_Poly1305 : Mirage_crypto.Chacha20.key aead
+
+type hash = Hash : 'k Digestif.hash -&gt; hash
+type cipher = AEAD : 'k aead -&gt; cipher
+type 'a algorithm = Pbkdf2 : int algorithm
+
+type secret and public
+
+val generate :
+  ?hash:hash -&gt;
+  ?ciphers:cipher * cipher -&gt;
+  ?g:Random.State.t -&gt;
+  password:string -&gt;
+  algorithm:'a algorithm -&gt; 'a -&gt;
+  secret * public
+
+val public_to_string : public -&gt; string
+val public_of_string : string -&gt; (public, [&gt; `Msg of string ]) result
+</code></pre>
+<p>Serialization is the very &quot;error-prone&quot; moment (little-endian, big-endian, how
+to handle error cases, <code>x = decode(encode(x))</code>?) and it is often a matter of
+using a tool to help us implement the <code>of_string</code>/<code>to_string</code> pair without
+pain.</p>
+<p>For this, and especially when we are looking for isomorphism as a property,
+there is <a href="https://github.com/mirage/encore">encore</a>! It allows you to describe a format and derive the
+<code>parse_string</code>/<code>emit_string</code> pair. Thus, <strong>by construction</strong>,
+<code>x = parse_string (emit_string x))</code>!</p>
+<pre><code class="language-ocaml">val public_format : public Encore.t
+
+let public_to_string v =
+  Encore.(Lavoisier.emit_string v (to_lavoisier public_format)
+
+let public_of_string str =
+  Angstrom.parse_string ~consume:All (Encore.to_angstrom public_format) str
+
+let assert_encore v =
+  assert (v = (Result.get_ok (public_of_string (public_to_string v))))
+</code></pre>
+<p>Of course, the definition of the format goes through combinators (in the same
+way as <a href="https://github.com/inhabitedtype/angstrom">angstrom</a>) which are a bit restrictive (applicative) because
+we have to ensure the bijection of each component of the format.</p>
+<pre><code class="language-ocaml">open Encore
+open Syntax
+
+let uint16be = Bij.v
+  ~fwd:(fun str -&gt; string_get_uint16_be str 0)
+  ~bwd:uint16_be_to_string
+
+let uint64be = Bij.v
+  ~fwd:(fun str -&gt; string_get_uint64_be str 0)
+  ~bwd:uint64_be_to_string
+
+let version = uint16be &lt;$&gt; fixed 2
+
+let algorithm_and_arguments = choice
+  [ const &quot;pbkdf2&quot; &lt;*&gt; (uint64be &lt;$&gt; fixed 8) ]
+
+let cipher =
+  let cipher = Bij.v
+    ~fwd:cipher_of_int
+    ~bwd:int_of_cipher in
+  (Bij.compose uint16be cipher) &lt;$&gt; fixed 2
+  
+let hash =
+  let hash = Bij.v
+    ~fwd:hash_of_int
+    ~bwd:(fun (Hash hash) -&gt; int_of_hash hash) in
+  (Bij.compose uint16be hash) &lt;$&gt; fixed 2
+
+let salt = fixed 16
+
+let public_format
+  : (int * (string * int64) * (cipher * cipher) * hash * string) Encore.t
+  = Bij.obj5 &lt;$&gt; (version
+                  &lt;*&gt; algorithm_and_arguments
+                  &lt;*&gt; (cipher &lt;*&gt; cipher)
+                  &lt;*&gt; hash
+                  &lt;*&gt; salt)
+</code></pre>
+<p>Of course the same applies to &quot;secret&quot; which contains much more information
+than &quot;public&quot;. &quot;secret&quot; should contain the same information as &quot;public&quot; as well
+as the values <code>E(m)</code>, <code>E(n)</code>, <code>k</code>, <code>L = l * P</code>.</p>
+<p>Finally, one can implement <code>generate</code> quite simply without worrying about these
+serialization issues. Of course, as far as &quot;secret&quot; is concerned, it is not
+strictly necessary to have the <code>secret_to_string</code>/<code>secret_of_string</code> pair,
+but it may be more conventional to provide these functions, especially if you
+are storing &quot;secret&quot; in a database.</p>
+<pre><code class="language-ocaml">let keys
+  : type a. salt:string -&gt; hash:hash -&gt; string -&gt;
+    algorithm:a algorithm -&gt; a -&gt; keys * int64
+  = fun ~salt ~hash password ~algorithm arguments -&gt;
+  let Hash hash = hash in
+  let mnkl = match algorithm with
+    | Pbkdf2 -&gt;
+      let count = arguments in
+      Pbkdf2.generate hash ~password
+        ~salt ~count (Int32.of_int (32 * 4)) in
+  let h_k = String.sub mnkl 64 32 in
+  let h_l = String.sub mnkl 96 32 in
+  let _M = ed25519_from_uniform mnkl ~off:0 in
+  let _N = ed25519_from_uniform mnkl ~off:32 in
+  let _L = ed25519_scalarmult_base mnkl ~off:96 in
+  let arguments = match algorithm with
+    | Pbkdf2 -&gt; Int64.of_int arguments in
+  (_M, _N, _L, h_k, h_l), arguments
+
+type public = string
+type secret = string
+
+let generate : type a.
+  ?hash:hash -&gt; ?ciphers:cipher * cipher -&gt; ?g:Random.State.t -&gt;
+  password:string -&gt; algorithm:a algorithm -&gt; a -&gt; public * secret
+  = fun ?(hash= Hash Digestif.SHA256)
+        ?(ciphers= AEAD GCM, AEAD ChaCha20_Poly1305)
+        ?g ~password ~algorithm arguments -&gt;
+  let salt = random_bytes ?g 16 in
+  let (_M, _N, _L, _k, _), arguments =
+    keys ~salt ~hash password ~algorithm arguments in
+  let Hash hash = hash in
+
+  let secret = Format.secret_to_string
+    ((version, (pbkdf2, arguments), ciphers, Hash hash, salt),
+     (_M, _N, _k, _L)) in
+  let public = Format.public_to_string
+    (version, (&quot;pbkdf2&quot;, arguments), ciphers, Hash hash, salt) in
+  secret, public
+</code></pre>
+<h3 id="others-primitives"><a class="anchor" aria-hidden="true" href="#others-primitives"></a>Others primitives</h3>
+<p>Let's put aside the question of transmission over the network for a moment and
+concentrate again on what is our <em>handshake</em>. Alice is able to create a
+&quot;public&quot; packet. It is then a matter of letting Bob deserialise it so that he
+generates <code>E(m)</code>, <code>E(n)</code>, <code>k</code> and <code>L = l * P</code> on its own way. According to what
+we have just described, Bob will also have to generate a random <code>X</code> value and
+send it to Alice.</p>
+<pre><code class="language-ocaml">type ctx =
+  { _k      : string
+  ; _l      : string
+  ; _N      : string
+  ; x       : string
+  ; _X      : string
+  ; ciphers : cipher * cipher }
+
+let hello ?g ~public password : (ctx * string, [&gt; error ]) result =
+  match Format.public_of_string public with
+  | Error _ -&gt; Error `Invalid_public_packet
+  | Ok (_version, (algorithm, arguments), ciphers, Hash hash, salt) -&gt;
+    let (_M, _N, _, _k, _l), _arguments =
+      match algorithm_of_int (string_get_uint16_be algorithm 0), arguments with
+      | Algorithm Pbkdf2, count -&gt;
+        let count = Int64.to_int count in
+        let algorithm = Pbkdf2 in
+        keys ~salt ~hash:(Hash hash) password ~algorithm count in
+    let x = random_scalar ?g () in
+    let gx = ed25519_scalarmult_base x ~off:0 in
+    let _X = ed25519_add gx keys._M in
+    Ok ({ _k; _l; _N; x; _X; ciphers },
+        _X)
+</code></pre>
+<p>On her side, Alice receives <code>X</code> and checks that it still belongs to our
+subgroup. She generates <code>Y</code> and sends it to Bob. This is also where the
+handshake can fail. Indeed, <code>X</code> must belong to our subgroup and if this is not
+the case, it certainly means that we were not expecting such an exchange
+between Alice and Bob (and that there could be an attacker). On the other hand,
+if all goes well, Alice is now able to generate the shared key - at this point
+she has all the information. However, we will initiate a final exchange where
+the generation of the shared key will propose &quot;validators&quot; that Bob can check
+on his side as well to make sure they both have the same shared key.</p>
+<pre><code class="language-ocaml">let server_compute ?g ~secret ~identity packet =
+  match Format.secret_of_string secret with
+  | Error _ -&gt; Error `Invalid_secret_packet
+  | Ok ((_version, (_algorithm, _arguments), ciphers, _hash, _salt),
+        (_M, _N, _k, _L)) -&gt;
+    let y = random_scalar ?g () in
+    let gy = ed25519_scalarmult_base y ~off:0 in
+    let _Y = ed25519_add gy _N in
+    let _X = packet in
+    let gx = ed25519_sub _X _M in
+    let* _Z = ed25519_scalarmult y ~off:0 ~point:gx in
+    let* _V = ed25519_scalarmult y ~off:0 ~point:_L in
+    let shared_key, validators = shared_key_and_validators
+      ~identity _X _Y _Z _k _V in
+    Ok ((shared_key, snd validators, ciphers),
+        (_Y ^ (fst validators)))
+</code></pre>
+<p>Bob can therefore retrieve <code>Y</code> and also generate the shared key. <code>Y</code> arrives
+with the &quot;validator&quot; which allows us to check that Bob has done everything
+right. The latter will send the other &quot;validator&quot; to Alice in order to finish
+the handshake on the agreement of a shared key!</p>
+<pre><code class="language-ocaml">let client_compute ~ctx ~identity packet =
+  let client_validator = String.sub packet 32 (String.length packet - 32) in
+  let _Y = String.sub packet 0 32 in
+  let gy = ed25519_sub _Y ctx._N in
+  let* _Z = ed25519_scalarmult ctx.x ~off:0 ~point:gy in
+  let* _V = ed25519_scalarmult ctx._l ~off:0 ~point:gy in
+  let shared_key, validators = shared_key_and_validators
+    ~identity ctx._X _Y _Z ctx._k _V in
+  if Eqaf.compare_le (fst validators) client_validator = 0
+  then Ok (shared_key, snd validators)
+  else Error `Invalid_client_validator
+
+let server_finalize ~server:(shared_key, validator, ciphers) packet =
+  if Eqaf.compare_le validator packet = 0
+  then Ok (shared_key, ciphers)
+  else Error `Invalid_server_validator
+</code></pre>
+<p>That's it! We have just implemented what is the heart of our SPAKE2+EE
+protocol, the <em>handshake</em>. As you can see, we are not talking about the network
+at all but just about a <code>string</code> exchange where the serialization issue is very
+important.</p>
+<p>The abstraction of operating the <em>handshake</em> without any network notion allows:</p>
+<ol>
+<li>focus on what is essential in terms of the exchange between Alice and Bob
+(and spare us the &quot;details&quot; of socket, TCP/IP, etc.)</li>
+<li>abstract our <em>handshake</em> beyond any network - and God knows that in the
+context of MirageOS, this abstraction is important</li>
+</ol>
+<pre><code class="language-ocaml">val generate :
+  ?hash:hash -&gt;
+  ?ciphers:cipher * cipher -&gt;
+  ?g:Random.State.t -&gt;
+  password:string -&gt;
+  algorithm:'a algorithm -&gt; 'a -&gt;
+  secret * public
+
+val public_to_string : public -&gt; string
+val public_of_string : string -&gt; (public, [&gt; error ]) result
+
+val hello :
+  ?g:Random.State.t -&gt;
+  public:public -&gt;
+  string -&gt;
+  (client * string, [&gt; error ]) result
+
+val server_compute :
+  ?g:Random.State.t -&gt;
+  secret:secret -&gt;
+  identity:string * string -&gt;
+  string -&gt;
+  (server * string, [&gt; error ]) result
+
+val client_compute :
+  client:client -&gt;
+  identity:(string * string) -&gt;
+  string -&gt;
+  (shared_key * string, [&gt; error ]) result
+
+val server_finalize :
+  server:server -&gt;
+  string -&gt;
+  (shared_key, [&gt; error ]) result
+</code></pre>
+<h2 id="handshake-implementation"><a class="anchor" aria-hidden="true" href="#handshake-implementation"></a>Handshake implementation</h2>
+<p>However, it may be worthwhile to assist and direct the end user as to the order
+in which the information (<code>salt</code>, <code>X</code>, <code>Y</code> and validators) enters Bob and
+Alice. So, if we could have something that could be composed quite easily with
+a <code>socket</code>, it would allow us to avoid some mistakes in the use of our
+cryptography library.</p>
+<p>The same is true for TLS, but I suspect that many <a href="https://github.com/mirleft/ocaml-tls">ocaml-tls</a> users
+don't know the details of what happens during the handshake (and all the
+details like 0-RTT that can literally complicate an implementation that hasn't
+abstracted so well from the network...).</p>
+<p>More pragmatically, a handshake is still a particular order of information
+exchange between Alice and Bob where it is essentially just a matter of reading
+or writing to a <code>socket</code>. If we could encode this order using OCaml without
+strictly depending on the <code>socket</code>, that would be great. Of course, you can
+imagine that for someone involved in MirageOS, this question has been asked
+many times before (HTTP, Git, SMTP, etc.)...</p>
+<h3 id="continuation-passing-style"><a class="anchor" aria-hidden="true" href="#continuation-passing-style"></a>Continuation-passing style</h3>
+<p>A particularly interesting style for describing an execution chain is CPS. In
+our case, our chaining would return our basic actions (read and write) as well
+as the <code>k</code>ontinuation that will execute the rest of our chain.</p>
+<p>This kind of design is quite common and you can see an example with
+<a href="https://github.com/mirage/colombe">Colombe</a>. It is mostly an extension of the API offered by
+<a href="https://github.com/mirleft/ocaml-tls">ocaml-tls</a> or <a href="https://github.com/mirage/decompress">decompress</a><sup><a href="#fn2">2</a></sup>- whose
+&quot;patent&quot; would come more from Daniel Bünzli's libraries.</p>
+<hr />
+<p><tag id="fn2"><strong>2</strong></tag>: with the difference that the continuation remains
+internal to the <code>state</code>, these libraries offer
+<code>state -&gt; [ Rd of state | Wr of state ]</code> but this is an API detail.</p>
+<hr />
+<pre><code class="language-ocaml">type 'a t =
+  | Read  of { buf : bytes; off : int; len : int
+             ; k : [ `Len of int | `Eof ] -&gt; 'a t }
+  | Write of { buf : string; off : int; len : int
+             ; k : int -&gt; 'a t }
+  | Done  of 'a
+  | Fail  of error
+
+let rec go f m len = match m len with
+  | Done v -&gt; f v
+  | Fail err -&gt; Fail err
+  | Read { buf; off; len; k } -&gt;
+    Rd { buf; off; len; k= go f k }
+  | Write { str; off; len; k } -&gt;
+    let k0 = function `End -&gt; k 0 | `Len len -&gt; k len in
+    let k1 = function
+      | 0 -&gt; go f k0 `End | len -&gt; go f k0 (`Len len) in
+    Wr { str; off; len; k= k1; }
+
+let ( let* ) =
+  fun m f -&gt; match m with
+  | Done v -&gt; f v
+  | Fail err -&gt; Fail err
+  | Rd { buf; off; len; k; } -&gt;
+    Rd { buf; off; len; k= go f k }
+  | Wr { str; off; len; k; } -&gt;
+    let k0 = function `End -&gt; k 0 | `Len len -&gt; k len in
+    let k1 = function 0 -&gt; go f k0 `End | len -&gt; go f k0 (`Len len) in
+    Wr { str; off; len; k= k1; }
+</code></pre>
+<p>It is then a question of having a &quot;state&quot; on which we can work and according to
+it, issue the right actions. Our protocol remains quite simple: it is a matter
+of reading packets whose size is predetermined - there are variants such as:</p>
+<ul>
+<li>a &quot;line-directed&quot; protocol where the end of a &quot;packet&quot; is notified with a
+<code>\r\n</code> (like SMTP)</li>
+<li>a &quot;packet-length&quot; protocol where a header informing the size of the packet is
+expected at the very beginning (like TLS or Git)</li>
+</ul>
+<p>But these protocols want to make variable packet size possible, which is not
+our case. The <em>salt</em> packet will always be the same size and <code>X</code> and <code>Y</code> are
+always the same size. <code>validators</code> also have a predefined size too.</p>
+<p>We therefore need essentially 2 functions:</p>
+<pre><code class="language-ocaml">val recv : state -&gt; len:int -&gt; string t
+val send : state -&gt; string -&gt; unit t
+</code></pre>
+<p>This is probably the most crucial moment in the implementation of a protocol.
+Indeed, if we're talking strictly about performance, we need to be able to
+issue the <code>Read</code> or <code>Write</code> only at times when we really need it - because, as
+far as our <code>'a t</code> type is concerned, it's when we receive these actions that
+our real <em>syscalls</em> (<code>Unix.read</code> and <code>Unix.write</code> for example) take place, and
+it's then that we can't optimise - the kernel comes into play.</p>
+<p>As far as we are concerned, we can take the advantage of 2 points:</p>
+<ul>
+<li>our packets are relatively small, we don't need to have a big intermediate
+buffer to handle them<sup><a href="#fn3">3</a></sup></li>
+<li>as we said, the packets have a certain size. We can therefore adopt a policy
+of &quot;read until we have <code>N</code> bytes&quot; rather than &quot;process until we have no more
+bytes&quot; (which is the <a href="https://github.com/inhabitedtype/angstrom">angstrom</a> politic)</li>
+</ul>
+<hr />
+<p><tag id="fn3"><strong>3</strong></tag>: We can even go further here and make the state
+containing our intermediate buffers small enough to use OCaml's super-fast
+minor heap allocation policy - though I wouldn't claim that this will make your
+program consistently faster. It all depends on how long the buffers live, a
+long life would mean copying the buffers... As Xavier Leroy said:</p>
+<blockquote>
+<p>You see, the Caml garbage collector is like a god from ancient mythology</p>
+</blockquote>
+<hr />
+<pre><code class="language-ocaml">exception Leave of error
+
+let safe k ctx =
+  try k ctx
+  with Leave err -&gt; Fail err
+
+let always x = fun _ -&gt; x
+
+type ctx =
+  { a_buffer : bytes
+  ; mutable a_pos : int
+  ; mutable a_max : int
+  ; b_buffer : bytes
+  ; mutable b_pos : int }
+
+let ctx () =
+  { a_buffer= Bytes.create 64
+  ; a_pos= 0
+  ; a_max= 0
+  ; b_buffer= Bytes.create 64
+  ; b_pos= 0 }
+
+let flush k0 ctx =
+  if ctx.b_pos &gt; 0
+  then
+    let rec k1 n =
+      if n &lt; ctx.b_pos
+      then Write { str= Bytes.unsafe_to_string ctx.b_buffer
+                 ; off= n
+                 ; len= ctx.b_pos - n
+                 ; k= (fun m -&gt; k1 (n + m)) }
+      else ( ctx.b_pos &lt;- 0
+           ; k0 ctx ) in
+    k1 0
+  else k0 ctx
+
+let write str ctx =
+  let max = Bytes.length ctx.b_buffer in
+  let rem = max - ctx.b_pos in
+  if String.length str &gt; rem
+  then invalid_arg &quot;Packet is too big&quot; ;
+  let len = String.length str in
+  Bytes.blit_string str j ctx.b_buffer ctx.b_pos len ;
+  ctx.b_pos &lt;- ctx.b_pos + len
+
+let send ctx str =
+  write str ctx ;
+  flush (always (Done ())) ctx
+
+let prompt ~required k ctx =
+  if ctx.a_pos &gt; 0
+  then
+    ( let rest = ctx.a_max - ctx.a_pos in
+      Bytes.blit ctx.a_buffer ctx.a_pos ctx.a_buffer 0 rest ;
+      ctx.a_max &lt;- rest ;
+      ctx.a_pos &lt;- 0 ) ;
+  let rec go off =
+    if off = Bytes.length ctx.a_buffer
+    then Fail `Not_enough_space
+    else if off - ctx.a_pos &lt; required
+    then let k = function
+           | `Len len -&gt; go (off + len)
+           | `End -&gt; Fail `End_of_input in
+         Read { buf= ctx.a_buffer
+              ; off= off
+              ; len= Bytes.length ctx.a_buffer - off
+              ; k= k }
+    else ( ctx.a_max &lt;- off
+         ; safe k ctx ) in
+  go ctx.a_max
+
+let recv ctx ~len =
+  let k ctx =
+    let str = Bytes.sub_string ctx.a_buffer ctx.a_pos len in
+    ctx.a_pos &lt;- ctx.a_pos + len ;
+    Done str in
+  prompt ~required:len k ctx
+</code></pre>
+<h3 id="our-handshake-implementation"><a class="anchor" aria-hidden="true" href="#our-handshake-implementation"></a>Our handshake implementation</h3>
+<p>We now have a mini-protocol in which we can describe the sending and receiving
+of our packets and execute our primitives in the order we want.</p>
+<pre><code class="language-ocaml">type cfg = Cfg : 'a algorithm * 'a -&gt; cfg
+
+let ( let+ ) x f = match x with
+  | Ok v -&gt; f v
+  | Error err -&gt; Fail (`Spoke err)
+
+let handshake_client ctx
+  ?g ~identity password =
+  (* &lt;= (1) salt &lt;= *)
+  let* public = recv ctx ~len:34 in
+  let+ public = public_of_string public in
+  let+ ciphers = ciphers_of_public public in
+  let+ client, packet = hello ?g ~public password in
+  (* =&gt; (2) X =&gt; *)
+  let* () = send ctx packet in
+  (* &lt;= (3) Y + validator &lt;= *)
+  let* packet = recv ctx ~len:96 in
+  let+ shared_key, packet = client_compute
+    ~client ~identity packet in
+  let* () = send ctx packet in
+  (* =&gt; (4) validator =&gt; *)
+  return (ciphers, shared_key)
+
+let handshake_server ctx
+  ?g ~password ~identity (Cfg (algorithm, arguments)) =
+  let secret, public = generate ?g ~password
+    ~algorithm arguments in
+  let+ ciphers = ciphers_of_public public in
+  let* () = send ctx (public_to_string public) in
+  (* =&gt; (1) salt =&gt; *)
+  let* packet = recv ctx ~len:32 in
+  (* &lt;= (2) X &lt;= *)
+  let+ server, packet = server_compute ~secret ~identity
+    packet in
+  let* () = send ctx packet in
+  (* =&gt; (3) Y + validator =&gt; *)
+  let* packet = recv ctx ~len:64 in
+  (* &lt;= (4) validator &lt;= *)
+  let+ shared_key = server_finalize ~server packet in
+  return (ciphers, shared_key)
+</code></pre>
+<p>We can now plug our handshakes with an implementation that allows us to read
+and write to a peer. The simplest and most common is of course <code>Unix</code> with a
+<code>socket</code>:</p>
+<pre><code class="language-ocaml">let run socket flow =
+  let rec go = function
+    | Done v -&gt; Ok v
+    | Fail err -&gt; Error err
+    | Read { buf; off; len; k; } -&gt;
+      ( match Unix.read socket buf off len with
+      | 0 -&gt; go (k `End)
+      | len -&gt; go (k (`Len len)) )
+    | Write { str; off; len; k; } -&gt;
+      let len = Unix.write_substring socket str off len in
+      go (k len) in
+  go flow
+
+let connect_client sockaddr =
+  let domain = Unix.domain_of_sockaddr sockaddr in
+  let socket = Unix.socket domain Unix.SOCK_STREAM 0 in
+  Unix.connect socket sockaddr ;
+  socket
+
+let connect_server sockaddr =
+  let domain = Unix.domain_of_sockaddr sockaddr in
+  let socket = Unix.socket domain Unix.SOCK_STREAM 0 in
+  Unix.bind socket sockaddr ;
+  Unix.listen socket 40 ;
+  ( match sockaddr with
+  | Unix.ADDR_UNIX path -&gt;
+    Stdlib.at_exit (fun () -&gt; try Unix.unlink path with _ -&gt; ())
+  | _ -&gt; () ) ;
+  socket
+
+let do_client sockaddr ?g ~identity password =
+  let ctx = ctx () in
+  let socket = connect_client sockaddr in
+  match run socket (handshake_client ctx ?g ~identity password) with
+  | Ok (ciphers, shared_key) -&gt; ...
+  | Error err -&gt; abort
+
+let do_server sockaddr ?g ~identity ~password cfg =
+  let ctx = ctx () in
+  let socket = connect_server sockaddr in
+  match run socket (handshake_server ctx ?g ~password ~identity cfg with
+  | Ok (ciphers, shared_key) -&gt; ...
+  | Error err -&gt; abort
+</code></pre>
+<p>We have finally made our mini protocol that manages our handshake! The last
+piece of code is a concrete implementation (with <code>Unix</code>) of everything we have
+just implemented. The way I see this whole development process is like that of
+an onion where you specialise at each level in relation to a very precise
+objective:</p>
+<ol>
+<li>to make our cryptographic primitives</li>
+<li>use them to implement the SPAKE2+EE logic (without the network logic)</li>
+<li>implement our handshake with network logic (reception &amp; transmission)</li>
+</ol>
+<p>Each level tries (and narrows down) to solve a problem that is constantly being
+specified: a good solution depends essentially on the way the problem is posed!
+This way of doing things allows especially to take some possible advantages
+(<code>[@@noalloc]</code>, isomorphism, small allocation, etc.) about performance and
+security.</p>
+<p>Finally, it is essentially a matter of keeping in mind the abstractions that
+you want. The job is ultimately to come up with a good API, again (and
+forever), but only experience (as far as a craft job is concerned) counts :) !</p>
+<h2 id="finally-a-flow-ciphers-and-mirageos"><a class="anchor" aria-hidden="true" href="#finally-a-flow-ciphers-and-mirageos"></a>Finally, a flow, ciphers and MirageOS!</h2>
+<p>For a MirageOS project, one of the constraints we have regarding the ecosystem
+is to respect certain interfaces in order to compose our implementation with
+other projects. As far as protocols are concerned, a fairly common interface is
+<a href="https://github.com/mirage/mirage-flow">Mirage_flow.S</a>. It describes what can be seen as a way to
+communicate with arbitrary content with a peer.</p>
+<p>Our last objective is to propose, like <a href="https://github.com/mirleft/ocaml-tls">ocaml-tls</a>, an
+implementation that respects this interface so that it can be used to implement
+a slightly higher-level protocol (such as HTTP and definitely put the S for
+Secure at the end of it).</p>
+<p>Still in the context of an abstraction, our implementation will wait (still
+like ocaml-tls) for the implementation of a Mirage_flow.S so that we can
+inject the TCP/IP implementation of <code>Unix</code> or <a href="https://github.com/mirage/mirage-tcpip">mirage-tcpip</a>.</p>
+<pre><code class="language-ocaml">module Make (Flow : Mirage_flow.S) : sig
+  include Mirage_flow.S
+
+  val client_of_flow : ?g:Random.State.t
+    -&gt; identity:(string * string) -&gt; password:string -&gt; Flow.flow
+    -&gt; (flow, [&gt; write_error ]) result Lwt.t
+
+  val server_of_flow : ?g:Random.State.t -&gt; cfg:cfg
+    -&gt; identity:(string * string) -&gt; password:string -&gt; Flow.flow
+    -&gt; (flow, [&gt; write_error ]) result Lwt.t
+end
+</code></pre>
+<p><code>client_of_flow</code> and <code>server_of_flow</code> will do the <em>handshake</em>. Then they will
+return a new <code>type flow</code> on which a transmission with GCM or ChaCha20 will be
+done between the two peers. The objective is to go a little further than the
+handshake in order to really propose a final way to communicate in a secure way
+with a weak password.</p>
+<p>First, we need to implement a <code>run</code> function that uses the <em>syscalls</em> in our
+<code>Flow</code> module to execute our <em>handshake</em>. The function is very similar to what
+we could do with the <code>Unix</code> module, except that we have to use the
+<a href="https://github.com/ocsigent/lwt">Lwt monad</a>. We will notice that it is quite simple to change the
+underlying implementation that will take care of the network.</p>
+<pre><code class="language-ocaml">let ( &gt;&gt;? ) = Lwt_result.bind
+let reword_error f = function
+  | Ok v -&gt; Ok v
+  | Error err -&gt; Error (f err)
+
+let run queue flow fiber =
+  let cs_wr = Cstruct.create 128 in
+  let allocator len = Cstruct.sub cs_wr 0 len in
+  let rec go = function
+    | Done v -&gt; Lwt.return_ok v
+    | Fail (#error as err) -&gt; Lwt.return_error err
+    | Read { buf; off; len; k; } as fiber -&gt;
+      if Ke.Rke.is_empty queue
+      then
+        Flow.read flow &gt;|= reword_error (fun err -&gt; `Flow err) &gt;&gt;? function
+        | `Eof -&gt; go (k `End)
+        | `Data cs -&gt;
+          Ke.Rke.N.push queue ~blit ~length:Cstruct.length cs ;
+          go fiber
+      else
+        ( let len = min len (Ke.Rke.length queue) in
+          Ke.Rke.N.keep_exn queue ~blit ~length:Bytes.length ~off ~len buf ;
+          Ke.Rke.N.shift_exn queue len ;
+          go (k (`Len len)) )
+    | Write { str; off; len; k; } -&gt;
+      let cs = Cstruct.of_string ~allocator ~off ~len str in
+      Flow.write flow cs &gt;|= reword_error (fun err -&gt; `Flow_write err)
+      &gt;&gt;? fun () -&gt; go (k len) in
+  go fiber
+</code></pre>
+<h3 id="ciphers"><a class="anchor" aria-hidden="true" href="#ciphers"></a>Ciphers</h3>
+<p>Our goal now is to initiate communication through GCM or ChaCha20. We will look
+at the possibility of the client communicating with a specific cipher and the
+server communicating with a cipher that may be different (just to confuse an
+attacker).</p>
+<p><a href="https://github.com/mirage/mirage-crypto">mirage-crypto</a> already offers an implementation of these
+ciphers (for TLS) and we essentially need two functions:</p>
+<pre><code class="language-ocaml">val encrypt : cipher_state -&gt; sequence:int64 -&gt; Cstruct.t -&gt; Cstruct.t
+val decrypt : cipher_state -&gt; sequence:int64 -&gt; Cstruct.t -&gt; Cstruct.t option
+</code></pre>
+<p>The <code>sequence</code> number allows a block to be tagged with a number that should
+only increment. In this way, we can check the order of our blocks (and be sure
+that we haven't forgotten one). This number is also shared between the client
+and the server to ensure that an attacker does not insert data arbitrarily (at
+least, that would be more difficult).</p>
+<p>Finally, the <code>cipher_state</code> contains the extra elements that will also be
+shared between the client and the server. There is of course our famous shared
+key but also the <code>nonce</code> (which will contain the <code>sequence</code>) as well as the
+<code>adata</code> which is a data external to the content we want to encrypt/decrypt
+allowing us to check the integrity of the block - generally, the size of the
+content to be encrypted is encoded.</p>
+<pre><code class="language-ocaml">module type CIPHER_BLOCK = sig
+  type key
+
+  val authenticate_encrypt : key:key -&gt; nonce:Cstruct.t -&gt; ?adata:Cstruct.t
+    -&gt; Cstruct.t -&gt; Cstruct.t
+  val authenticate_decrypt : key:key -&gt; nonce:Cstruct.t -&gt; ?adata:Cstruct.t
+    -&gt; Cstruct.t -&gt; Cstruct.t option
+
+  val of_secret : Cstruct.t -&gt; key
+  val tag_size : int
+end
+
+let module_of : type k. k aead -&gt; k cipher_block = function
+  | GCM -&gt; (module Mirage_crypto.Cipher_block.AES.GCM)
+  | ChaCha20_Poly1305 -&gt;
+    let module M = struct
+      include Mirage_crypto.Chacha20
+      let tag_size = Mirage_crypto.Poly1305.mac_size
+    end in (module M)
+
+type 'k cipher_block = (module CIPHER_BLOCK with type key = 'k)
+
+type cipher_state =
+   State : { key : 'k; nonce : Cstruct.t
+           ; impl : 'k cipher_block } -&gt; cipher_state
+
+let make_nonce nonce seq =
+  let seq =
+    let len = Cstruct.length nonce in
+    let seq =
+      let buf = Cstruct.create 8 in
+      Cstruct.BE.set_uint64 buf 0 seq ; buf in
+    let pad = Cstruct.create (len - 8) in
+    Cstruct.append pad seq in
+  xor nonce seq
+
+let make_adata len =
+  let buf = Cstruct.create 4 in
+  Cstruct.BE.set_uint16 buf 0 Spoke.version ;
+  Cstruct.BE.set_uint16 buf 0 len ; buf
+
+let encrypt (State { key; nonce; impl= (module Cipher_block); }) sequence buf =
+  let nonce = make_nonce nonce sequence in
+  let adata = make_adata (Cstruct.length buf + Cipher_block.tag_size) in
+  Cipher_block.authenticate_encrypt ~key ~adata ~nonce buf
+
+let decrypt (State { key; nonce; impl= (module Cipher_block); }) sequence buf =
+  let nonce = make_nonce nonce sequence in
+  let adata = make_adata (Cstruct.length buf) in
+  Cipher_block.authenticate_decrypt ~key ~adata ~nonce buf
+</code></pre>
+<h3 id="from-a-flowflow-to-our-flow"><a class="anchor" aria-hidden="true" href="#from-a-flowflow-to-our-flow"></a>From a <code>Flow.flow</code> to our flow</h3>
+<p>Finally, we can define our flow type which will contain the states of our
+ciphers and ring-buffers. You can observe several times the use of <a href="https://github.com/mirage/ke">ke</a>, a
+library that implements a ring-buffer <a href="http://xenbits.xen.org/docs/4.6-testing/misc/xenstore-ring.txt">à la Xen</a>. The latter
+will serve as an intermediate buffer between encryption and decryption, it will
+make us 2 since, as we said, the algorithm may not be the same between the
+client and the server (depending on the direction).</p>
+<p>One detail that is important in our new protocol is the ability for the client
+or server to know the size of the incoming blocks. Several policies can be
+implemented, we can set a size and add a tag (the <code>adata</code>) informing us if it
+is the last block we receive or not. We can also decide to transmit the block
+with its size (at the very beginning) to the TLS in order not to manage the
+previous logic (which can be complicated). We will therefore send 2 bytes at
+the very beginning (as a kind of header) which will inform the receiver of the
+number of bytes it should receive next - the famous &quot;packet-length&quot; directed
+protocol.</p>
+<p>Finally, it will be a question of executing our previous <code>run</code> function with
+the handshake (depending on whether we are the server or the client) in order
+to obtain either an error (which we will report to the user), or the shared key
+and the expected ciphers.</p>
+<pre><code class="language-ocaml">let remaining_bytes_from_ctx ctx =
+  if ctx.a_pos &gt;= ctx.a_max then &quot;&quot;
+  else Bytes.sub_string ctx.a_buffer a_pos (a_max - a_pos)
+
+type flow =
+  { flow : Flow.flow
+  ; recv : cipher_state
+  ; send : cipher_state
+  ; recv_record : Cstruct.t
+  ; send_record : Cstruct.t
+  ; mutable recv_seq : int64
+  ; mutable send_seq : int64
+  ; recv_queue : (char, Bigarray.int8_unsigned_elt) Ke.Rke.t
+  ; send_queue : (char, Bigarray.int8_unsigned_elt) Ke.Rke.t }
+
+let client_of_flow ?g ~identity ~password flow =
+  let ctx = ctx () in
+  let queue = Ke.Rke.create ~capacity:128 Bigarray.char in
+  run queue flow (handshake_client ctx ?g ~identity password)
+  &gt;&gt;? fun ((cipher0, cipher1), sk) -&gt;
+  let recv = cipher_state_of_key_nonce_and_cipher sk cipher0 in
+  let send = cipher_state_of_key_nonce_and_cipher sk cipher1 in
+  let recv_queue = Ke.Rke.create ~capacity:0x10000 Bigarray.char in
+  let send_queue = Ke.Rke.create ~capacity:0x10000 Bigarray.char in
+  (* We can pre-allocate our blocks since they will not be larger than 0xFFFF
+     (our 2 bytes which gives the size of the next block). *)
+  let recv_record =
+    let State { impl= (module Cipher_block); _ } = recv in
+    Cstruct.create (2 + max_record + Cipher_block.tag_size) in
+  let send_record =
+    let State { impl= (module Cipher_block); _ } = send in
+    Cstruct.create (2 + max_record + Cipher_block.tag_size) in
+  (* Finally, our `run` function may, &quot;by mistake&quot;, consume more than the
+     handshake. We must therefore copy these possible bytes into our queue (so
+     as not to lose anything). *)
+  let rem = remaining_bytes_from_ctx ctx in
+  Ke.Rke.N.push recv_queue ~blit ~length:String.length rem ;
+  Lwt.return_ok { flow
+                ; recv; send
+                ; recv_record; send_record
+                ; recv_seq= 0L; send_seq= 0L
+                ; recv_queue; send_queue; }
+</code></pre>
+<p>The implementation of <code>server_of_flow</code> is almost the same except for the
+<em>handshake</em> used. So we can tackle the last few operations, namely <code>read</code> &amp;
+<code>write</code> (and <code>close</code> but the latter will only call <code>Flow.close</code>).</p>
+<h3 id="intermediate-buffers-and-syscalls"><a class="anchor" aria-hidden="true" href="#intermediate-buffers-and-syscalls"></a>Intermediate buffers and <em>syscalls</em></h3>
+<p>Our role is essentially to &quot;parse&quot; a record (a block) and decrypt it. However,
+we may find ourselves in a state where we have not yet received the entire
+block - so we will apply the same policy as when we implemented our
+<em>handshake</em>: read until we have <code>N</code> bytes (initially, we will need to get at
+least 2 bytes, then the size given in those two bytes.</p>
+<p>For sending, it's even simpler, fill our intermediate buffer/queue and then
+flush <code>0xFFFF</code> blocks until there is nothing left - the last block will
+probably be smaller than 0xFFFF of course.</p>
+<pre><code class="language-ocaml">let get_record record queue cipher_state =
+  let State { impl= (module Cipher_block); _ } = cipher_state in
+  match Ke.Rke.length queue with
+  | 0 -&gt; `Await_hdr
+  | 1 -&gt; `Await_rec 1
+  | 2 | _ -&gt;
+    Ke.Rke.N.keep_exn queue ~blit ~length:Cstruct.length record ~len:2 ;
+    let len = Cstruct.BE.get_uint16 record 0 in
+    if Ke.Rke.length queue &gt;= len
+    then ( Ke.Rke.N.keep_exn queue ~blit ~length:Cstruct.length record ~len
+         ; Ke.Rke.N.shift_exn queue len
+         ; `Record (Cstruct.sub record 2 (len - 2)) )
+    else `Await_rec (len - Ke.Rke.length queue)
+
+let rec read flow =
+  match get_record flow.recv_record flow.recv_queue flow.recv with
+  | `Record buf -&gt;
+    ( match decrypt flow.recv flow.recv_seq buf with
+    | Some buf (* copy *) -&gt;
+      (* Don't forget to increment [seq] to keep the same state as our peer. *)
+      flow.recv_seq &lt;- Int64.succ flow.recv_seq ;
+      Lwt.return_ok (`Data buf)
+    | None -&gt; Lwt.return_error `Corrupted )
+  | (`Await_hdr | `Await_rec _) as await -&gt;
+    ( Flow.read flow.flow &gt;&gt;= function
+    | Error err -&gt; Lwt.return_error (`Flow err)
+    | Ok `Eof -&gt;
+      (* If the connection is closed by peer and we did not receive our
+         &quot;header&quot;, we safely can say that nothing left. *)
+      if await = `Await_hdr
+      then Lwt.return_ok `Eof
+      else Lwt.return_error `Corrupted
+    | Ok (`Data buf) -&gt;
+      Ke.Rke.N.push flow.recv_queue ~blit ~length:Cstruct.length buf ;
+      read flow )
+
+let record ~dst ~sequence queue cipher_state =
+  let len = min 0xffff (Ke.Rke.length queue) in
+  Ke.Rke.N.keep_exn queue ~length:Cstruct.length ~blit ~off:2 ~len dst ;
+  let buf (* copy *) = encrypt cipher_state sequence (Cstruct.sub dst 2 len) in
+  Ke.Rke.N.shift_exn queue len ;
+  let len = 2 + Cstruct.length buf in
+  Cstruct.BE.set_uint16 dst 0 len ;
+  Cstruct.blit buf 0 dst 2 (Cstruct.length buf) ;
+  Cstruct.sub dst 0 len 
+
+let rec flush flow =
+  if not (Ke.Rke.is_empty flow.send_queue)
+  then let record = record
+         ~dst:flow.send_record ~sequence:flow.send_seq
+         flow.send_queue flow.send in
+       ( flow.send_seq &lt;- Int64.succ flow.send_seq
+       ; Flow.write flow.flow record &gt;&gt;? fun () -&gt;
+         flush flow )
+  else Lwt.return_ok ()
+
+let write flow data =
+  Ke.Rke.N.push flow.send_queue ~blit:blit0 ~length:Cstruct.length data ;
+  flush flow &gt;&gt;= function
+  | Ok () -&gt; Lwt.return_ok ()
+  | Error err -&gt; Lwt.return_error (`Flow_write err)
+
+let close flow = Flow.close flow.flow
+</code></pre>
+<p>That's it! We finally have a <a href="https://github.com/mirage/mirage-flow">Mirage_flow.S</a> protocol that uses
+our <em>handshake</em> and then uses symmetric encryption from a key shared with a
+peer.</p>
+<p>More concretely, the idea of TLS is quite similar except that what is common
+between the different parties (instead of our weak password) are the
+authorities (like let's encrypt) that issue the certificates. However, we find
+this notion of handshake which, finally, remains the most important since it is
+at this moment that there can be leaks which can help the attacker.</p>
+<p>In the end, the abstraction remains very close to what <a href="https://github.com/mirleft/ocaml-tls">ocaml-tls</a>
+and especially <code>tls.mirage</code> offers, making it easy to compose protocols
+(with <a href="https://github.com/dinosaure/mimic">mimic</a>).</p>
+<p>Like <code>mirage-tcpip</code>, <code>Unix</code> or <code>Tls_mirage.Make</code>, we can now imagine a higher
+level protocol because we have just implemented a security layer rather than an
+actual protocol (like HTTP). And on this question, I already have an idea of
+what I want to implement - but that will be the order of another article!</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>The article may seem a bit long (compared to the others) but it does show one
+aspect, or at least a systematic reflection that one can have on MirageOS
+projects. The pragmatism of utility may be good but then choices are made whose
+basis is not so clear - like wanting to absolutely send and receive information
+from the start, which involves Unix without realising the inherent
+incompatibility with MirageOS afterwards.</p>
+<p>The example of dependency on Unix remains fairly obvious - especially if you
+read my articles - but there are other finer choices as well. This &quot;onion&quot;
+method especially allows you to backtrack when what you want is not so obvious.
+You can always find solutions to specific problems, it's just a matter of
+finding the right solutions sometimes.</p>
+<p>OCaml offers an environment which is not very helpful in this respect, the type
+system is still essential to direct the development - and to realise sometimes
+our little mistakes in the scope of our information, its uses, etc.</p>
+<p>Finally, if I have proposed 3 steps to the creation of a mini protocol, it is
+to focus each part on what is essential to them. I sometimes use the term
+'essentialiser' (from the French) to describe my approach and often people
+misunderstand me - which is normal given my level of English. And yet, this is
+what it is all about, reducing the problem to its strict minimum.</p>
+<p>An interesting effect of this approach is then the re-appropriation of my work
+by others on several levels. Some will choose simplicity while others (I often
+refer to them as the other 10%) will, like me, want to go into details even if
+it means looking at the code.</p>
+<p>And if you find this work interesting, you can make a donation to
+<a href="https://robur.coop/Donate">robur.coop</a>. You can find the project <a href="https://github.com/dinosaure/spoke">here</a>.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

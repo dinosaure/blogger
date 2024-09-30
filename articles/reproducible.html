@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteReproducibility!
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Reproducibility!</h1>
+    <ul class="tags-list"><li>OCaml</li><li>Reproducible</li><li>Build</li><li>MirageOS</li></ul><p>Reproducibility! You may not have noticed, but <a href="https://robur.coop">Robur</a> has
+done a lot of work on several levels to provide an infrastructure to ensure the
+reproducibility of your applications (and our unikernels).</p>
+<p>But before going into the details of such an infrastructure, we need to define
+what reproducibility is and what problems we are trying to solve.</p>
+<p>I would like to say that I am only a user of this infrastructure (available
+<a href="https://builds.robur.coop">here</a>). Since I arrived at Robur (beyond the
+countless projects I want to do), one of my goals has been to:</p>
+<ol>
+<li>really deploy unikernels</li>
+<li>use them</li>
+<li>ensure their reproducibility</li>
+<li>use the artefacts produced in my unikernel infrastructure</li>
+<li>(bonus) monitor these unikernels (which will be the subject of another
+article)</li>
+</ol>
+<p>I would like to give special thanks to Robur and its initial team (to which I
+have added myself) who not only created this infrastructure but also helped me
+in all the steps of deployment on my server. And if I had to add a small stone
+to the edifice, it would of course be this article which is meant to explain
+this infrastructure.</p>
+<h1 id="what-does-reproducibility-mean"><a class="anchor" aria-hidden="true" href="#what-does-reproducibility-mean"></a>What does reproducibility mean?</h1>
+<p>Reproducibility is a <strong>deterministic</strong> build process where one ensures, from the
+sources and a build environment, to produce the same binary byte per byte.</p>
+<p>In fact, the difficulty of reproducibility is not so much in the OCaml code or
+in the OCaml compiler (which itself remains very deterministic) but in the build
+environment. In particular, variables such as date, language or paths need to be
+normalized.</p>
+<hr>
+<h3 id="the-ocaml-compiler"><a class="anchor" aria-hidden="true" href="#the-ocaml-compiler"></a>The OCaml compiler</h3>
+<p>Hannes remarks that &quot;the OCaml compiler&quot; story is a bit longer - and depends on
+the definition of reproducibility (with robur and orb, we e.g. always build in
+the same path, as the same user -- also intermediate build products
+(cma/cmxa/...) are not taken into consideration). There were reproducibility
+issues in the OCaml runtime, which have been fixed:</p>
+<ul>
+<li><a href="https://github.com/ocaml/ocaml/issues/7037">Binaries are not reproducible</a>
+<ul>
+<li><a href="https://github.com/ocaml/ocaml/pull/321"><code>ocamldoc</code> fix</a> (from Debian)</li>
+<li><a href="https://github.com/ocaml/ocaml/commit/eef84c432a4fcecc83f02d81b347cf819c69df9f">don't put temporary file names into object files</a></li>
+<li><a href="https://github.com/ocaml/ocaml/pull/862">fix <code>Location.input_name</code> setting</a></li>
+</ul>
+</li>
+<li>Unix <code>sort</code> output depends on language set
+<ul>
+<li><a href="https://github.com/ocaml/ocaml/pull/898">ocaml/ocaml#898</a></li>
+<li><a href="https://github.com/ocaml/ocaml/pull/8986">ocaml/ocaml#8986</a></li>
+<li><a href="https://github.com/ocaml/ocaml/pull/10333">ocaml/ocaml#10333</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/ocaml/ocaml/pull/1845">Custom runtime embed temporary file name</a></li>
+<li>Build path prefix map (to allow reproducible builds with different paths)
+<ul>
+<li><a href="https://github.com/ocaml/ocaml/pull/1515">ocaml/ocaml#1515</a></li>
+<li><a href="https://github.com/ocaml/ocaml/pull/1856">ocaml/ocaml#1856</a></li>
+<li><a href="https://github.com/ocaml/ocaml/pull/1930">ocaml/ocaml#1830</a></li>
+</ul>
+</li>
+<li><a href="https://github.com/ocaml/ocaml/issues/9307"><code>*.cma</code> is not reproducible</a>,
+fixed by <a href="https://github.com/ocaml/ocaml/pull/9345">ocaml/ocaml#9345</a> (also
+<a href="https://github.com/ocaml/ocaml/pull/9991">ocaml/ocaml#9991</a>)</li>
+</ul>
+<p>All these patches are related to values that cannot be set by the environment
+(such as the date), the use of temporary files (such as OCaml-generated assembly
+files), the non-deterministic behaviour of some Unix tools (such as <code>sort</code>)
+which may depend on the system language, or the absolute paths in artefacts
+which should be able to be reduced to relative paths (one might want to compile
+the same file in <code>foo/</code> and then in <code>bar/</code> without this altering the
+compilation). Finally, the production of *.cma seemed to correspond to
+non-deterministic behaviour of the system.</p>
+<p>It is worth noting that Debian has been very forward-thinking on the issue of
+reproducibility and that most of these patches have been notified from the
+Debian bug tracker. Indeed, they have decided to make all Debian packages
+reproducible since 2013. The OCaml team has set this goal as well.</p>
+<p>From my point of view, and the resulting patches, reproducibility is still a
+matter of details. Basically, the majority of these patches don't change what
+the compiler does globally, but specify the pipeline a bit more so that it is
+reproducible.</p>
+<hr>
+<p>Nevertheless, if such an environment exists, what really interests the developer
+in this phase is not so much the result obtained but a tool that can:</p>
+<ol>
+<li>verify this reproducibility in their development</li>
+<li>be notified of sources that may alter the reproducibility of their software</li>
+</ol>
+<p>From a &quot;releaser&quot; point of view, it is indeed this reproducibility that
+interests us since it is what we want to distribute. But, as I said, the
+difficulty is not here, since it is a matter of freezing a build context - of
+course, it is still a big job to freeze such a context.</p>
+<p>But from the point of view of a developer - who is therefore iterating in their
+code - it is mainly a question of recognising what can alter the build process
+in order to really identify what it depends on.</p>
+<p>In this respect, ensuring a deterministic build and normalising the elements
+that can intervene in the build process and thus creating a build context is
+only one step. The other step is to be able to identify the elements that can
+alter the reproduction process. Indeed, this build context must be exhaustive
+but can be extremely broad. Thus, reproducibility does not only concern the
+result but also the tools that can help to prove this reproducibility.</p>
+<p>Such a tool would ensure that the project is replicable on a daily basis. It
+would provide a complete description of a build context. Unfortunately, whether
+as a developer or as a user, this context can change (for example, via an
+update). In this respect, the tool must be able to:</p>
+<ul>
+<li>disqualify elements that do not alter our build</li>
+<li>notify us if our daily process is no longer reproducible and why (e.g. list
+the elements that have changed compared to the last build to help us
+understand why our software is no longer reproducible)</li>
+</ul>
+<h2 id="why-does-reproducibility-matter"><a class="anchor" aria-hidden="true" href="#why-does-reproducibility-matter"></a>Why does reproducibility matter?</h2>
+<p>There are many reasons for wanting reproducibility and these reasons are not the
+same depending on which hat we wear. Indeed, reproducibility does not answer the
+same problems for a developer as for a releaser. Nevertheless, if we were to
+crystalize the interest in reproducibility into a more general concept, it would
+be trust.</p>
+<p>As far as a developer is concerned, their job is, among other things, to fix
+bugs. The problem is to find the bug: where does it come from? This is where the
+archaeological work begins, starting with our code. However, bugs can exist
+outside our code. They can appear in the libraries we use. Worse, they can
+appear in the libraries that the libraries we use use... But the question
+becomes eminently complex when two developers try to find the same bug. This
+situation arises when one of them says: &quot;It works for me&quot;. In this case, we are
+much more likely to consider that the bug does not come from our code but from
+the underlying dependencies we use: we can see that the software is not
+reproducible since from one computer to another, the behaviour is different for
+the same code. This is where the question arises: can we trust our workflow to
+build our software?</p>
+<p>For a releaser, the problem can be even more serious. The release process
+consists of building the software and then distributing it. We talked about
+&quot;freezing&quot; this build context above. However, as a releaser, have we really
+taken into account all the dependencies (and security patches) in order to
+produce a single piece of software? One could legitimately ask the question
+whether our build computer would not be infected, or whether it really takes
+into account all security updates. The releaser must then make an exhaustive
+audit of what they need to build the software. If reproducibility is not
+assured, this means that this &quot;frozen&quot; context is not exhaustive and that there
+are in fact two larger contexts (of which the first is only a subset) that do
+not produce the same software. Where is the difference? Why is there a
+difference? What is the impact of this difference (about security)? All these
+questions bring us back to the trust that we place in this context, can I trust
+such a context to be sure that I have a deterministic production of my software?</p>
+<p>Finally, reproducibility also concerns the user. Downloading software or an
+executable carries a risk - a risk of infection, piracy, etc. A user who
+downloads your software trusts you. Now the question is: where does this trust
+come from? It can come from the beers you share together to remake the world, or
+it can come from a transparent and repeatable process that the user can repeat
+to ensure that your distributed software is the software you built (no added
+malicious code, an exhaustive dependency graph that can be audited, etc.).</p>
+<p>As we have said, reproducibility reaffirms the bond of trust that can exist in
+the software production chain from developer to user. One can legitimately say
+that all these steps are not fundamentally necessary (and one could even
+question the usefulness of these for an end user) but one must conceive the idea
+that the notion of security of a software and particularly the notion of trust
+that one grants to a software is above all and for something that is built.</p>
+<p>It is certainly not something established (like saying: look! my software is
+secure!). It's about giving proofs that will never affirm that our software is
+secure but will give signals and reasons why you should trust us.</p>
+<h2 id="orb"><a class="anchor" aria-hidden="true" href="#orb"></a><code>orb</code></h2>
+<p><code>orb</code> is the initial tool that will both launch the build and aggregate the
+information to define this famous context. From the latter, the user wants to
+restart the build and:</p>
+<ol>
+<li>show for a different context (an update), the software remains the same</li>
+<li>ensure that for the same context, the software remains the same</li>
+<li>notify differences if 2 contexts do not produce the same software</li>
+</ol>
+<p>In detail, <code>orb</code> expects an OPAM package which is rather straightforward for
+OCaml software. Indeed, one can introspect the reproducibility at several
+levels. One could aggregate the hashes of all <code>*.cmx</code> and be sure that compiling
+<code>N</code> caml objects produces a deterministic result. But it is above all a notion
+of cursor that is at stake. As we said, the OCaml compiler is quite
+deterministic, should we really consume computation time for a result that we
+already know <em>a priori</em>?</p>
+<p>Introspecting reproducibility at the level of caml objects would surely be a
+waste of time. Where compilation becomes complex is when it interacts with other
+elements:</p>
+<ul>
+<li>a C compiler to compile the C files</li>
+<li>an external dependency such as a *.so</li>
+<li>the use of external tools in the construction of our dependencies (like sed,
+awk, etc.)</li>
+</ul>
+<p>Thus, the granularity of what can break the reproducibility of our software is
+not found in the compiler, nor in <code>dune</code> for example but more in the
+dependencies: the packages.</p>
+<p>It is quite simple to use, only OPAM is needed. <code>orb</code> will create a temporary
+switch and will try to compile your package in this switch. Let's take the
+example of <a href="https://github.com/dinosaure/hxd"><code>hxd</code></a>:</p>
+<pre><code class="language-shell=bash">$ opam pin add https://github.com/roburio/orb.git -y
+$ orb build hxd
+[ORB] using root &quot;/home/dinosaure/.opam&quot; and switch &quot;orb228afdtemp&quot;
+[ORB] Switch orb228afdtemp created!
+[ORB] Install start
+[ORB] Install hxd
+[ORB] Installed hxd
+[ORB] tracking map got locks
+[ORB] got tracking map, dropping states
+[ORB] writing $PWD/hxd.build-hashes
+[ORB] cleaning up
+[ORB] Switch orb228afdtemp removed
+[ORB] cleaning up
+</code></pre>
+<p>This build created several files: <code>build-environment</code>, <code>opam-switch</code>,
+<code>system-packages</code> and <code>hxd.build-hashes</code>. This is our context and its expected
+output (the hash of the various objects installed). We can then rebuild from
+this context with <code>orb rebuild</code>:</p>
+<pre><code class="language-shell=bash">$ orb rebuild .
+[ORB] environment matches
+[ORB] Switch orb228afdtemp created!
+[ORB] now importing switch
+[ORB] Switch orb228afdtemp imported!
+[ORB] tracking map got locks
+[ORB] got tracking map, dropping states
+[ORB] writing $PWD/hxd.build-hashes
+[ORB] comparing with old build dir no
+[ORB] It is reproducible!!!
+[ORB] cleaning up
+[ORB] Switch orb228afdtemp removed
+</code></pre>
+<p>As we expected, our software is reproducible in a specific context. It is quite
+expected that software released in OCaml is reproducible in a general way. <code>hxd</code>
+is even simpler as it is only OCaml and has very few dependencies.</p>
+<p>So reproducibility from a defined state in a fixed time has been assured. But
+what is really interesting for us is to know if this reproducibility continues
+to exist even though the ecosystem evolves. Indeed, an update of <code>cmdliner</code> for
+example can lead to an alteration in the code produced and in this case, our
+reproducibility is no longer assured. But identifying these elements that evolve
+in spite of ourselves and that have an impact on our software requires
+meticulous and repetitive work.</p>
+<p><code>orb</code> helps us to make this work meticulous by aggregating for us the elements
+involved in the compilation of our software. Let's move on to the repetition.</p>
+<h2 id="builder"><a class="anchor" aria-hidden="true" href="#builder"></a><code>builder</code></h2>
+<p>What we are talking about here can be defined as a Continuous Integration
+infrastructure where this reproducibility check should take place on a daily
+basis. CI is a real problem in itself, but our use of it is quite simple, it can
+even be likened to a CRON task that would call <code>orb</code> daily.</p>
+<p>The question is more about the deployment of such an infrastructure. This is
+where <a href="builder"><code>builder</code></a> comes in. It is basically a daemon that will ask
+workers to run <code>orb</code>.</p>
+<p>The communication between this daemon and the workers is done through the
+<code>ASN.1</code> protocol (just like <code>albatross</code>). Again, Robur has done an excellent job
+that goes far beyond creating such software. Indeed, as said, the problem here
+is the deployment and distribution of <code>builder</code> and <code>builder-worker</code>
+incorporating the necessary elements to interface well with <code>systemd</code> (for
+Debian) or FreeBSD. And to enable the launch of <code>orb</code>, we simply use <code>docker</code> to
+launch Ubuntu, install <code>orb</code> and run the command.</p>
+<pre><code class="language-shell=bash">$ curl -fsSL https://apt.robur.coop/gpg.pub | gpg --dearmor &gt; /usr/share/keyrings/apt.robur.coop.gpg
+# echo &quot;deb [signed-by=/usr/share/keyrings/apt.robur.coop.gpg] https://apt.robur.coop ubuntu-20.04 main&quot; &gt; /etc/apt/sources.list.d/robur.list
+/ replace ubuntu-20.04 with e.g. debian-11 on a debian buster machine
+$ sudo apt update
+$ sudo apt install builder
+$ sudo systemctl start builder
+$ sudo systemctl start builder-worker
+</code></pre>
+<h3 id="a-local-opam-repository"><a class="anchor" aria-hidden="true" href="#a-local-opam-repository"></a>A local OPAM repository</h3>
+<p>In what defines your context, it has of course the OPAM deposit. For real use of
+<code>orb</code> and <code>builder</code>, the most interesting thing is to manage your own OPAM
+repository to put your software in before releasing it publicly.</p>
+<p>One could simply use the OPAM tool, which makes it fairly easy to deploy a new
+repository. It would then be a matter of adding this repository to the platforms
+that <code>builder</code> can handle. But I think you are used to my taste for unikernels:
+so why not use a unikernel as an OPAM repository?</p>
+<p><a href="https://github.com/roburio/opam-mirror"><code>opam-mirror</code></a> is a good project that allows, from a Git
+repository, to offer an OPAM repository as <code>opam.ocaml.org</code>. The unikernel is
+very simple, it is an HTTP server with a cache system that synchronizes with a
+Git repository. The idea is to create our own Git repository and then deploy our
+unikernel. We won't do all the steps and especially the build step, Robur has
+its own reproducibility infra in which <code>opam-mirror</code> is proposed:
+<a href="https://builds.robur.coop/job/opam-mirror/build/latest">latest opam-mirror from builds.robur.coop</a></p>
+<p>We're not going to play around with <code>solo5-hvt</code> either, but directly use
+<code>albatross</code> which is available from the Robur APT repository:</p>
+<pre><code class="language-shell=bash">$ sudo apt install albatross
+$ sudo systemctl start albatross_daemon
+</code></pre>
+<p>If you haven't done so, a unikernel needs a virtual &quot;bridge&quot; in order to connect
+to it. Usually, you add these lines to <code>/etc/network/interfaces</code> (a restart of
+the networking service is required afterwards):</p>
+<pre><code>auto service iface service
+  inet manual up ip link add service-master address 02:00:00:00:00:01 type dummy
+  up ip link set dev service-master up
+  up ip link add service type bridge
+  up ip link set dev service-master master service
+  up ip addr add 10.0.0.1/24 dev service
+  up ip link set dev service up
+  down ip link del service
+  down ip link del service-master
+</code></pre>
+<p>Fortunately, we do not need to communicate with the outside world and the
+outside world does not need to communicate with our unikernel (we could, but
+that is not the point). The <code>iptables</code> rules are therefore not necessary!</p>
+<p>Now we need to create a Git &quot;server&quot;. In fact, from a Git perspective, only our
+SSH server is required. We just need:</p>
+<ol>
+<li>create a Git user</li>
+<li>add our public keys to <code>.ssh/authorized_keys</code></li>
+<li>create a Git repository with <code>git init --bare</code> in the $HOME folder of Git</li>
+</ol>
+<pre><code class="language-shell=bash">$ sudo adduser git
+$ su git
+$ cd
+$ mkdir .ssh &amp;&amp; chmod 700 .ssh
+$ touch .ssh/authorized_keys
+$ chmod 600 .ssh/authorized_keys
+$ mkdir opam-repository.git
+$ cd opam-repository.git
+$ git init --bare
+</code></pre>
+<p>A <a href="https://discuss.ocaml.org/t/irmin-examples-or-pointers-of-interacting-with-remote-repositories-esp-using-authentication-via-ssh/10648">question</a> was asked about SSH and <code>ocaml-git</code> keys. Our
+workflow for unikernels is to generate a <em>in-the-fly</em> SSH key (in order to
+separate the use of our repository by our unikernels and our own use). By
+default, we generate an RSA SSH key with <code>awa_gen_key</code> (available via the OPAM
+package <code>awa</code>). This gives 2 lines:</p>
+<ol>
+<li>a seed to regenerate the private key from the Fortuna engine</li>
+<li>the public key in the format expected by SSH</li>
+</ol>
+<pre><code class="language-shell=bash">$ awa_gen_key
+seed is pUxPne3bfhuihCPH3VhJtjm2/NIM5ooQndXUc5Ey
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDdwvJJ5Z/GaKWoRJcf5jrY952emqlNao+ZUtzkuUExjEp979YdH0oc/LfWDOJrWHeP64RgpY2CUatDJ1WxVUeDpH8sOH/szNAXbozjKUV9XPUae96rk44M5xABGl/Z5S+uMvOkdeWI3mHrhnjp2apbs1x+qO0J3WGqOZQyryMnkdtu7DSy5Ky1at6FIx/j2ZLO2MVhXrO8lr7EX4dALYJPHSkAwn6t0VqNBe1OCKVphiI2BQMPLeINhq7AQx8DZOyS/d/K8+1nzDFHji2NCBzAEI6pAU/I9xIar5qJzy46qkutZYZ9+755aQDya/CIZeQ7Fq/jeWY06hQowFMHqUYGflQKT+MgZlu+3P7Ipds1vSFUR7nDMzNYIk+2oKAV1cCBvwT0oalV2xZBfrE9RcDKF/TfTjt9FzPNLWXcYafIGlz6I8w2dgLGHxKJUg+Dzqxhts8EjsqcEKPdEUcfByrUwTo/fWN2L+Hc4zhhgiAa4zcszgUjYsvMAZDc4N1Y6YtVXHNoxY1UlEjJY4A+8+TgQAMll8+kLGrBi4XJGwfTP9h6oDYVtb8wnWLQPAUWtJV297HkP1QDhWJrlnZLVbck28QoTJ6yZ6T0aZBKrspJjb689DYChtHAHZZvzwZ6nT5XZKvZQi8H3SMWacvxuGtiWUjJ+CXM3GfNo6joPA2Hxw== awa@awa.local
+</code></pre>
+<p>The second line should be copied to the <code>.ssh/authorized_keys</code> in Git. The first
+one will be transmitted to our unikernel in this way (with <code>albatross</code>).</p>
+<pre><code class="language-shell=bash">$ albatross-client-local create --net=service:service --block=tar:opam-mirror --mem=512 \
+  mirror mirror.hvt \
+  --arg=&quot;--ipv4=10.0.0.2/24&quot; \
+  --arg=&quot;--ipv4-gateway=10.0.0.1&quot; \
+  --arg=&quot;--remote=git@10.0.0.1:opam-repository.git#master&quot; \
+  --arg=&quot;--ssh-key=rsa:pUxPne3bfhuihCPH3VhJtjm2/NIM5ooQndXUc5Ey&quot;
+</code></pre>
+<p>That's it! All you have to do is add your packages in the OPAM format and the
+OPAM repository format. To do this, the root must contain at least a <code>repo</code> file
+and a <code>package</code> folder. Then, to understand the structure of an OPAM repository,
+you can take inspiration from <a href="https://github.com/ocaml/opam-repository"><code>opam-repository</code></a>. Finally, the
+unikernel provides a gateway for it to resynchronise with the Git repository.</p>
+<pre><code class="language-shell=bash">$ git clone git@localhost:opam-repository.git
+$ cd opam-repository
+$ echo 'opem-version: &quot;2.0&quot;' &gt; repo
+$ mkdir packages
+$ touch packages/.gitkeep
+$ git add repo packages
+$ git commit -m &quot;First commit&quot;
+$ git push
+$ curl http://10.0.0.2/update
+</code></pre>
+<p>And yes, there never really was a Git server per se. The idea has always been to
+&quot;leave&quot; the authentication management to another protocol (in this case SSH).
+There is however a way to have a non-secure Git server with <code>git daemon</code> but
+this method is deprecated for obvious reasons. This is one of the big changes in
+<a href="https://github.com/mirage/ocaml-git/pull/395"><code>ocaml-git</code> 3</a>, the implementation of the Git protocol is the same
+whether it is via TCP/IP, SSH or HTTP.</p>
+<h2 id="how-to-launch-a-reproducible-build"><a class="anchor" aria-hidden="true" href="#how-to-launch-a-reproducible-build"></a>How to launch a reproducible build?</h2>
+<p>Now we need to inform the templates to build our software from our new OPAM
+repository. We will use the <code>/etc/builder/orb-build.template.ubuntu-20.04</code>
+template for now.</p>
+<pre><code class="language-diff">diff --git a/a b/b index b3b67a5..f5a99fa 100644 ---
+a/a +++ b/b @@ -8,5 +8,5 @@ rm orb.deb
+ 
+ DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends --no-install-suggests -y dh-exec
+ 
+-repos=&quot;default:https://opam.ocaml.org&quot;
++repos=&quot;default:https://opam.ocaml.org,local:http://10.0.0.2/&quot;
+orb build --disable-sandboxing --solver-timeout=600 --switch-name=/tmp/myswitch --date=1589138087 --out=. --repos=$repos %%OPAM_PACKAGE%%
+</code></pre>
+<p>Let's say we have released the <a href="https://github.com/dinosaure/bob"><code>bob</code></a> software with a full description of
+its OPAM file in our repository. <code>builder</code> provides a <code>builder-client</code> tool to
+interact with the daemon. Thus, one can add a package to build and reproduce.
+The first argument is the name of the software, the second the name of the OPAM
+package.</p>
+<pre><code class="language-shell=bash">$ builder-client orb-build bob bob
+</code></pre>
+<p>We can see that a docker image has been launched and is trying to compile our
+project now! <code>builder</code> will then try to allocate a worker every day to compile
+your project. It will keep track of the contexts and compare them to the result
+of the build. Thus, as we expected, it will ensure reproducibility and if this
+is no longer available, show us the difference that involved altering our
+result.</p>
+<p>Hannes says: setup this way, orb uses the HEAD of opam-repository, thus it
+prepares rolling releases. the output of orb includes exact frozen packages (and
+git commits), so they are reproducible.</p>
+<h2 id="builder-web"><a class="anchor" aria-hidden="true" href="#builder-web"></a><code>builder-web</code></h2>
+<p>Finally, the last software of this infrastructure is <a href="https://github.com/roburio/builder-web">a website</a> to
+make the results available and more digestible through a nice web interface! The
+latter will allow to present several information such as:</p>
+<ul>
+<li>the context (a complete description of the required system packages, OPAM
+packages and environment variables)</li>
+<li>the build output (useful when you get a build error)</li>
+<li>the final artifact available for download (very useful for the distribution of
+the software)</li>
+<li>a build history with a diff between each</li>
+<li>a dependency graph</li>
+<li>a graph showing the weight of OCaml modules in the final artifact</li>
+</ul>
+<p>This website is also available from the APT repository offered by Robur. Thus,
+it can be easily installed and deployed. One particular point should be noted
+however.</p>
+<p><code>builder</code> just tries to reproduce your software but as far as its distribution
+is concerned (notably on the website), it makes us specify where to upload the
+artefacts. So we need to change the way <code>builder</code> is launched a little.</p>
+<p>In this, <code>builder-web</code> has a little user management (to protect access to the
+upload). So we also create a user for <code>builder-web</code> (with a password) and inform
+<code>builder</code> to use it.</p>
+<pre><code class="language-shell=bash">$ sudo apt install builder-web
+$ sudo builder-db migrate
+$ sudo builder-db user-add dinosaure --unrestricted
+Password: foo
+$ sudo systemctl start builder-web
+</code></pre>
+<p>And finally, we must modify <code>/usr/lib/systemd/system/builder.service</code> with:</p>
+<pre><code class="language-diff">9c9
+&lt; ExecStart=/usr/bin/builder-server
+---
+&gt; ExecStart=/usr/bin/builder-server --upload http://dinosaure:foo@localhost:3000/upload
+</code></pre>
+<p>That's it! You have a website available at <code>http://localhost:3000/</code> on which
+there is an aggregate of all your builds - with all the information needed to
+prove/reproduce your software.</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>You will note that all this software is reproducible and available (beyond APT)
+on Robur's infra: https://builds.robur.coop/. In fact, the software on APT is
+the same as on the Robur's infra. The package repository at <code>apt.robur.coop</code> is
+fed by the daily builds, and all the above mentioned software (<code>orb</code>, <code>builder</code>,
+<code>builder-web</code>, <code>albatross</code>) are reproducible and are daily build -- thus
+subscribing to the package repository enables you to get the latest package with
+an update.</p>
+<p>For my part, I deployed the infrastructure on my side in order to be able to
+distribute my famous Bob software (and make it reproducible). Then I made a
+small update to Contruno so that it could redirect TLS connections from
+<a href="https://builds.osau.re"><code>builds.osau.re</code></a> to <code>builder-web</code>. So, my
+infrastructure is available here (and 2 unikernels, <code>contruno</code> and <code>opam-mirror</code>
+are involved).</p>
+<p>In fact, once you understand how <code>orb</code>, <code>builder</code>, <code>builder-worker</code> and
+<code>builder-web</code> work, you can see that: 1) these solutions can be composed with
+other solutions which does not make them monolithic - this is my preferred
+approach 2) it is actually quite easy to deploy these tools - the only barrier
+is the lack of documentation and where to start but this article tries to
+address that issue 3) the result is nice! It didn't take me long to try to
+reproduce Bob (who, however, has a rather complex build because of Cosmopolitan)</p>
+<p>For its usefulness, its simplicity and the result, I take the liberty of
+advertising it since it is a project that finally brings a lot to the
+development of software, its distribution and the release process.</p>
+<p>It is a project that can also be articulated with <code>albatross</code>. I haven't tested
+it yet but imagine: you have packages about your unikernels (which is possible
+since <code>mirage</code> produces an OPAM file of your project) which you add to your
+local repository and then ask <code>builder</code> to ensure reproducibility. You could
+then ask albatross to get the Solo5 images from this infrastructure! And
+apparently this is possible - but I haven't tested it yet.</p>
+<p>The issue of APT (and more generally, the distribution of software outside the
+OPAM world) becomes just as simple. Again, the process is not clearly identified
+but it is clear that Robur is taking advantage of its infrastructure to maintain
+an APT repository available on Debian and Ubuntu.</p>
+<p>More generally, such an infrastructure helps to build trust between users and
+developers. This is all the more true in the case of Bob, which is ultimately
+just a big binary. As mentioned in the introduction, one can always wonder about
+the risks involved in downloading a binary and running it on one's computer. To
+this legitimate question, I answer: reproducibility</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

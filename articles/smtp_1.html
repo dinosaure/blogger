@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteDeploy an SMTP service (1/3)
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Deploy an SMTP service (1/3)</h1>
+    <ul class="tags-list"><li>OCaml</li><li>MirageOS</li><li>SMTP</li><li>Deployement</li></ul><p>In this series of articles, we will see how to &quot;basically&quot; deploy several
+unikernels that talk to each other to set up an email service. As you know, for
+quite some time now, I've been developing an email stack where we would be able
+to send and receive emails from a given domain name.</p>
+<p>More generally, email or rather your email address is perhaps the most important
+element of your life on the Internet. Indeed, the simple fact of registering
+requires an email address and when you lose information, access (a phone...),
+it is the ultimate access to recover everything else because almost EVERYTHING
+is associated with your email address (except the files sent with <a href="https://bob.osau.re/">Bob</a>!).</p>
+<p>For such an important and central service in a person's life, it might be better
+to have absolute control of it. And this is perhaps what motivates me most about
+email development.</p>
+<h2 id="a-partial-solution"><a class="anchor" aria-hidden="true" href="#a-partial-solution"></a>A partial solution</h2>
+<p>However, and anyone who has wanted to deploy their own email service, an email
+service... is complicated. The complexity is on several levels:</p>
+<ul>
+<li>SMTP, email, etc. are historical artifacts of the Internet that have evolved
+very little (in contrast to HTTP). Cultural and historical knowledge is often
+required (much more than purely technical knowledge)</li>
+<li>There is unfortunately a monopoly situation that imposes implicit &quot;rules&quot;
+(outside of RFCs) that are difficult to reappropriate</li>
+<li>being the central element of your identity on the internet, it is perhaps the
+service that needs the most technical attention</li>
+</ul>
+<p>In this respect, it is still difficult to offer today, with all the efforts one
+can imagine, a viable solution that corresponds to all uses. Nevertheless, and
+this concerns especially the last point, we can be satisfied with partial
+solutions that can already be used and tested. This is, in my opinion, the only
+viable way to finally reappropriate the email service correctly.</p>
+<p>Our partial solution is therefore an SMTP relay. This means that under a
+specific domain name:</p>
+<ul>
+<li>you can send an email</li>
+<li>you can receive emails <strong>that will be forwarded to your real email address</strong></li>
+</ul>
+<p>In other words, we do not implement an IMAP server. You can get a slightly more
+technical but still global description <a href="https://mirage.io/blog/2022-04-01-Mr-MIME">here</a>.</p>
+<h3 id="unikernels"><a class="anchor" aria-hidden="true" href="#unikernels"></a>Unikernels</h3>
+<p>It is important to understand that such a service can be a milestone for
+unikernels. It was always possible to develop unikernels that could talk to more
+conventional services (and vice versa).</p>
+<p>This is still the case with our SMTP stack, but this time all the necessary
+parts can be unikernels! In this series of articles, we will see how to deploy
+all these unikernels:</p>
+<ul>
+<li>a primary DNS server</li>
+<li>a DNS resolver</li>
+<li>a secondary DNS server to be able to do Let's encrypt challenges</li>
+<li>a submission server (to submit emails)</li>
+<li>a DKIM signer</li>
+<li>a SMTP server to send incoming emails (from a private network) to Internet</li>
+<li>a SPF verifier</li>
+<li>a spam filter</li>
+</ul>
+<p>As you can see, we have several unikernels to deploy. The idea is that each
+service can be replaced by a conventional (unix) service. For example, you could
+have your own service that does DKIM signing and that would not prevent the
+other unikernels from being deployed.</p>
+<p>This method is particularly about always offering the end user a way out in what
+he/she uses (he/she can't be forced to use all our unikernels) but also about
+debugging our infrastructure properly and piece by piece.</p>
+<p>This is also why we have divided this article into 3 parts:</p>
+<ol>
+<li>the first (this one) consists of the deployment of our DNS service</li>
+<li>the second one is about our ability to send an email</li>
+<li>finally, it will be about receiving emails</li>
+</ol>
+<h2 id="a-provider-and-a-domain-name"><a class="anchor" aria-hidden="true" href="#a-provider-and-a-domain-name"></a>A provider and a domain-name</h2>
+<p>This may be the only part where your wallet will be required (unfortunately not
+for me). One limitation we have about unikernels is the server.</p>
+<p>Indeed, to be able to deploy a unikernel requires access to virtualization
+through Xen or KVM. The latter is very popular but usually requires a
+<em>bare-metal</em> server: a real physical server.</p>
+<p>Of course, Mirage offers other ways like deploying a service with seccomp (which
+only requires a basic Linux). But it is common (for Mirage users) to prefer KVM
+simply to use <a href="https://github.com/roburio/albatross"><code>albatross</code></a> and to configure the infrastructure well
+on all levels (which can be very difficult with Google Cloud for example). In
+this respect, a bare-metal server can be (very) expensive. As an example, my
+server costs ~40 euros per month which is quite a lot - of course, I have a very
+high usage for all my unikernels (9 at the time of writing).</p>
+<p>It's quite understandable that some users can't afford to invest in it. There
+are however inexpensive solutions. VPS with nested KVM support! The idea is to
+offer the user a complete virtualised system that can virtualise (and therefore
+run our unikernels).</p>
+<p>This offer is never explicit, but if you have a VPS, it doesn't cost you
+anything to know if you can have nested virtualisation. In order to explain all
+the steps, I found <a href="https://cp.launchvps.com/index.php">this provider</a> that offers nested virtualization
+and where the prices are affordable. A VPS with 2 cores seems to be sufficient
+for our use.</p>
+<p>Another necessary element for the emails is a domain name. You probably know
+better providers than me. The special thing here is that we will not let these
+providers take care of our domain name but we will do it ourselves! <strong>Be careful
+though</strong>, it is clear that using a domain name for emails can then lead to it
+being registered in deny-lists!</p>
+<p>Indeed, I have rather spoken of a monopoly as far as emails are concerned and
+this is also the criticism that one finds most often when it comes to managing
+one's own email service. It is easy for a domain name to fall into the
+deny-lists of Gmail or Outlook for obscure reasons (resulting from those famous
+tacit rules explained above). I therefore advise you to take a domain name that
+is not very important to you.</p>
+<p>For those who have been following me for a long time, I own the domain
+x25519.net. The story behind this is that my original domain name (osau.re)
+has been taken over by a Chinese construction company... So I used this first
+one but having recovered osau.re, it is no longer of much use to me. So we will
+use <strong>x25519.net</strong> here to deploy our email service (provided by
+<a href="https://gandi.net/">gandi.net</a>)</p>
+<h3 id="host-operating-system"><a class="anchor" aria-hidden="true" href="#host-operating-system"></a>Host operating system</h3>
+<p>I am primarily a Debian/Ubuntu user. So we will use <strong>Debian 11</strong> in this series
+of articles. It is perhaps the most used system. However, as far as deploying
+unikernels is concerned, FreeBSD or OpenBSD also work.</p>
+<p>Indeed, a fairly constant work that I try to maintain is the support of Solo5
+for these platforms. The system should clearly not be a limitation (as is KVM
+support for example).</p>
+<h2 id="bridge-albatross-and-user"><a class="anchor" aria-hidden="true" href="#bridge-albatross-and-user"></a>Bridge, <code>albatross</code> and user</h2>
+<p>Many people don't understand this black magic, but for the deployment of a
+unikernel, we need a bridge. The aim is to connect &quot;virtual cables&quot; between our
+unikernels and this bridge so that they can at least communicate with each
+other.</p>
+<pre><code class="language-sh">            [ bridge:service ] 10.0.0.1
+             |    |    |    |
+        .----'    |    |    '----.
+[ tap100 ] [ tap101 ][ tap102 ] [ tap103 ]
+
+ 10.0.0.2   10.0.0.3  10.0.0.4   10.0.0.5
+</code></pre>
+<p>It's really like having a <a href="https://en.wikipedia.org/wiki/Network_bridge">bridge</a> and having 4 computers connected to
+that bridge with an ethernet cable. The <em>tap</em> interfaces will be created by
+<code>albatross</code> and our unikernels will connect to them. We will associate an IP
+address for each unikernel.</p>
+<p>This is the way to create a private network. Unikernels can communicate with
+each other but the Internet cannot communicate with them and they cannot
+communicate with the Internet.</p>
+<p>To make the bridge, the best way is to install <code>bridge-utils</code> and modify the
+<code>/etc/network/interfaces</code> file to add it:</p>
+<pre><code class="language-sh">$ apt install bridge-utils
+$ cat &gt;/etc/network/interfaces &lt;&lt;EOF
+
+auto service
+iface service inet static
+  address 10.0.0.1
+  netmask 255.255.255.0
+  broadcast 10.0.0.255
+  bridge_ports none
+  bridge_stp off
+  bridge_fd 0
+  bridge_maxwait 0
+EOF
+$ reboot
+$ ip a
+3: service: &lt;NO-CARRIER,BROADCAST,MULTICAST,UP&gt; mtu 1500 qdisc noqueue state DOWN group default qlen 1000
+    link/ether 42:ea:2f:4e:99:33 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.1/24 brd 10.0.0.255 scope global service
+       valid_lft forever preferred_lft forever
+</code></pre>
+<p>Finally, we will install <code>albatross</code> (and the micro-kernel <a href="https://github.com/Solo5/solo5">Solo5</a>) which
+allows us to deploy our unikernels correctly:</p>
+<pre><code class="language-sh">$ apt install gnupg
+$ curl -fsSL https://apt.robur.coop/gpg.pub | gpg --dearmor &gt; /usr/share/keyrings/apt.robur.coop.gpg
+$ echo &quot;deb [signed-by=/usr/share/keyrings/apt.robur.coop.gpg] https://apt.robur.coop ubuntu-20.04 main&quot; &gt; /etc/apt/sources.list.d/robur.list
+# replace ubuntu-20.04 with e.g. debian-11 on a debian buster machine
+$ apt update
+$ apt install solo5 albatross
+$ systemctl enable albatross_stats
+$ systemctl enable albatross_daemon
+$ systemctl enable albatross_console
+$ systemctl start albatross_daemon
+</code></pre>
+<h3 id="iptables"><a class="anchor" aria-hidden="true" href="#iptables"></a><code>iptables</code></h3>
+<p>We have our own private network but we would like to communicate with the
+outside world and make sure that the outside world communicates with us. This
+is where we will use <code>iptables</code> to configure our &quot;nat&quot; to forward:</p>
+<ol>
+<li>some incoming connections (notably our emails but also our DNS requests)</li>
+<li>let the host system handle outcoming packets between the unikernels and the
+Internet. This requires the host system to rewrite the TCP/IP packets to
+replace the unikernel private IP with your public IP. This mechanism is
+called <code>MASQUERADE</code></li>
+</ol>
+<p>However, we will do this as we go along to really understand the implications of
+our <code>iptables</code> commands. So let's start by deploying some of our unikernels.</p>
+<h2 id="the-dns-stack"><a class="anchor" aria-hidden="true" href="#the-dns-stack"></a>The DNS stack</h2>
+<p>Email relies on another widely used protocol which is the DNS protocol. Beyond
+being able to exchange emails, the first objective in the deployment of an
+infrastructure (for an association or a company) is to &quot;present&quot; itself to the
+Internet and to inform where is located what will become one of the central
+parts of your infrastructure: your primary DNS server.</p>
+<p>On the &quot;other side&quot;, you also need to have access to the Internet and be able to
+resolve domain names and know where they are located (as you do, to know where
+you are located).</p>
+<p>We are talking about 2 distinct services that use the same protocol:</p>
+<ul>
+<li>a server that tells you where its infrastructure is located (its IP address)</li>
+<li>a server that is able to tell where the infrastructures/authorities are
+located according to their domain names</li>
+</ul>
+<p>The second service is often <strong>already</strong> offered. The best known resolver (but
+perhaps the one you should be most wary of) is Google with its DNS resolver
+<a href="https://developers.google.com/speed/public-dns">8.8.8.8</a>. In our case, we prefer to use DNS resolvers like
+<a href="https://blog.uncensoreddns.org/">uncensoreddns</a>. Better than that, it is more interesting to
+deploy your own DNS resolver to avoid censorship and you can do it with a
+unikernel!</p>
+<h3 id="the-dns-resolver"><a class="anchor" aria-hidden="true" href="#the-dns-resolver"></a>The DNS resolver</h3>
+<p>The idea of the DNS resolver is to be used internally. From an external point of
+view, it is not necessary. On the other hand, for our future unikernels for
+emails, some will use this DNS resolver to resolve the MX field and to know
+where the email server where we have to send our emails is located.</p>
+<p>Fortunately, the <a href="https://robur.coop/">Robur</a> association builds and distributes unikernels
+for you. We could look at how to build a unikernel here but we'll concentrate on
+deployment. So you can download the image (<code>bin/resolver.hvt</code>) here:</p>
+<p><a href="https://builds.osau.re/job/dns-resolver/build/latest/">https://builds.osau.re/job/dns-resolver/build/latest/</a></p>
+<p>Secondly, it is about:</p>
+<ol>
+<li>allowing the DNS resolver to communicate with the outside world (with
+<code>iptables</code>)</li>
+<li>use <code>albatross</code> to launch the unikernel <code>resolver.hvt</code></li>
+</ol>
+<pre><code class="language-sh">$ echo &quot;1&quot; &gt; /proc/sys/net/ipv4/ip_forward
+$ iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -j MASQUERADE
+$ wget https://builds.osau.re/job/dns-resolver/build/latest/f/bin/resolver.hvt
+$ cat resolver.sh &lt;&lt;EOF
+#!/bin/bash
+
+albatross-client-local create --mem=64 \
+  --net=service:service resolver resolver.hvt \
+  --restart-on-fail \
+  --arg=&quot;--ipv4=10.0.0.2/24&quot; \
+  --arg=&quot;--ipv4-gateway=10.0.0.1&quot;
+EOF
+$ chmod +x resolver.sh
+$ ./resolver.sh
+host [vm: :resolver]: success: created VM
+$ apt install dnsutils
+$ dig +short google.com @10.0.0.2
+142.251.40.110
+</code></pre>
+<p>That's it! The last line with the <code>dig</code> utility confirms that our unikernel
+works and can resolve domain names.</p>
+<p>You have probably noticed the &quot;restart-on-fail&quot; option. This option will restart
+the unikernel if it goes down. About this option, it comes from the fact that we
+have been observing (for quite some time <a href="https://github.com/mirage/mirage-tcpip/issues/499">now</a>) memory leaks in our
+unikernels. However, we have to admit that the boot time of the unikernel is
+very fast. In this respect, the interrupt should be almost transparent.</p>
+<h3 id="the-primary-dns-server-with-git"><a class="anchor" aria-hidden="true" href="#the-primary-dns-server-with-git"></a>The primary DNS server with Git</h3>
+<p>A fairly common design with unikernels is to use a Git repository to store
+information that the unikernel will then synchronise to. The advantage here is:</p>
+<ol>
+<li>the unikernel does not need a file system</li>
+<li>it keeps track (with the Git history) of all changes</li>
+<li>we can easily (with the Git tool) go back to a data state in which our
+unikernel is working</li>
+</ol>
+<p>To do this, we use the <a href="https://github.com/roburio/git-kv"><code>git-kv</code></a> project which does exactly that. But
+this requires a &quot;Git server&quot;. In truth, Git doesn't really implement a server,
+it implements tools that can wrap themselves in streams managed by servers (an
+SSH server or an HTTP server). The basic deployment (explained by the <a href="https://git-scm.com/book/en/v2/Git-on-the-Server-Setting-Up-the-Server">Git
+manual</a>) is to create a Git user, add <em>bare</em> repositories and use
+SSH to <code>fetch</code>/<code>push</code>.</p>
+<pre><code class="language-sh">$ apt install git
+$ ssh-keygen -t ed25519 -f $HOME/.ssh/id_ed25519 -N &quot;&quot;
+$ adduser git
+$ su git
+git$ cd
+git$ mkdir .ssh &amp;&amp; chmod 700 .ssh
+git$ touch .ssh/authorized_keys &amp;&amp; chmod 600 .ssh/authorized_keys
+git$ exit
+$ ssh-copy-id $HOME/.ssh/id_ed25519 git@localhost
+$ ssh git@localhost
+git$ mkdir zone.git
+git$ cd zone.git
+git$ git init --bare
+git$ exit
+$ git clone git@localhost:zone.git
+$ cd zone
+$ git commit --allow-empty -m &quot;First commit&quot;
+</code></pre>
+<p>Here, we create what will become our Git repository<sup><a href="#fn1">1</a></sup>
+<code>zone.git</code> which will contain our <a href="https://en.wikipedia.org/wiki/Zone_file">zone file</a> for our domain name.</p>
+<hr />
+<p><tag id="fn1"><strong>1</strong></tag>: A common problem is the branch name, it seems to me
+that the Debian 11 version of Git still uses the name &quot;master&quot; (instead of
+&quot;main&quot;). In our case, we'll specify the branch in the arguments expected by our
+unikernels - but keep in mind the branch you're using.</p>
+<h4 id="git-ssh--unikernels"><a class="anchor" aria-hidden="true" href="#git-ssh--unikernels"></a>Git, SSH &amp; unikernels</h4>
+<p>We now need to explain another aspect related to Git, unikernels and SSH
+communication. When it comes to deployment and security, it is important not to
+put carrots and potatoes in the same basket. Thus, providing an <strong>exclusive</strong>
+communication channel between our unikernels and Git via SSH remains a
+preferable solution.</p>
+<p>The exclusivity in question here is <strong>not to use</strong> our SSH key (which we have
+just generated) to ensure communication between our unikernels and Git but
+rather to generate a new key which will only be used by our unikernels.</p>
+<p>To do this, we have thought of everything, including a tool that can generate
+keys <em>on the fly</em> and give you a representation that you can then give to the
+unikernel as an argument on the command line.</p>
+<pre><code class="language-sh">$ apt install opam
+$ opam init
+$ opam switch create 4.14.0
+$ opam install awa
+$ eval $(opam env)
+$ awa_gen_key --keytype ed25519
+ED25519 private key AqKcLX40SblHbAeZ63FCDXJD3xOiRUmCRxzxQFThEf4=
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF3PyCx3KPc84KGXpel9uMwwKailyUWnoLICjSZo37Y7 awa@awa.local
+</code></pre>
+<p>The first line is our private key and the second line is the public key. The
+latter will have to be added to the authorized keys for Git.</p>
+<pre><code class="language-sh">$ awa_gen_key --keytype ed25519 &gt; ssh.key
+$ tail -n1 ssh.key &gt; unikernel_ed25519.pub
+$ cat unikernel_ed25519.pub | ssh git@localhost &quot;cat &gt;&gt; .ssh/authorized_keys&quot;
+</code></pre>
+<h4 id="glue-record-and-domain-name-providers"><a class="anchor" aria-hidden="true" href="#glue-record-and-domain-name-providers"></a>Glue record and domain-name providers</h4>
+<p>We need to understand one last point more specific to DNS. When we are in
+possession of a domain name, the provider also offers the possibility to manage
+the primary DNS server itself. This is the &quot;basic&quot; use of buying and using a
+domain name.</p>
+<p>However, in our revolutionary plan to re-appropriate the means of production,
+we would like to manage our own domain name. To do this, we need to inform our
+provider of the location of our primary DNS server. This involves adding a
+&quot;Glue record&quot; informing the public IP address of our <code>ns1.&lt;your-domain&gt;</code> server.
+Finally, we need to notify the provider that our primary DNS server is external
+and corresponds to <code>ns1.&lt;you-domain&gt;</code>.</p>
+<p>In my case, I must notify gandi.net that:</p>
+<ul>
+<li>my domain name is managed by <code>ns1.x25519.net</code> (and <code>ns6.gandi.net</code> is a
+secondary DNS server that Gandi offers<sup><a href="#fn2">2</a></sup>)</li>
+<li><code>ns1.x25519.net</code> points to <code>76.8.60.93</code> (my VPS) as &quot;Glue record&quot;</li>
+</ul>
+<hr />
+<p><tag id="fn2"><strong>2</strong></tag>: At the moment I have some issues with Gandi and it
+seems that the transfer between the primary and secondary server requires some
+undocumented mechanism. However, it is mandatory to have a second DNS server for
+your domain name. We won't talk about the latter since it requires a second
+public IP address... However, if you are in the situation where the primary
+server cannot do the transfer, <a href="https://robur.coop/">Robur</a> has a few secondary servers at its
+disposal. Just contact us!</p>
+<h3 id="deploy-your-dns-primary-git"><a class="anchor" aria-hidden="true" href="#deploy-your-dns-primary-git"></a>Deploy your DNS primary Git</h3>
+<p>Our first objective is to create our &quot;zone file&quot;. The latter must contain some
+information, notably the SOA (Start Of Authority) field and say that it is the
+authority managing our domain name.</p>
+<p>This authority, we have informed with our provider (with Gandi) and we must
+reaffirm it from our own primary server. Here, we inform that our authority is:
+<code>ns1.x25519.net</code>.</p>
+<p>Then, we affirm where <code>ns1.x25519.net</code> is located and, at the same time,
+<code>x25519.net</code>.</p>
+<pre><code class="language-sh">$ cd zone
+$ cat &gt;x25519.net &lt;&lt;EOF
+$ORIGIN	x25519.net.
+$TTL	3600
+@		IN	SOA	ns1	hostmaster	1	86400	7200	1048576	3600
+@		IN	NS	ns1
+@		IN	NS	ns6.gandi.net.
+@		IN	A	76.8.60.93
+ns1		IN	A	76.8.60.93
+ns6.gandi.net.	IN	A	217.70.177.40
+EOF
+</code></pre>
+<p>An update mechanism also exists with DNS and this can be password protected.
+Indeed, our primary DNS server will make a &quot;clone&quot; of our Git repository. The
+problem is if we modify this Git repository, do we have to restart our server?
+The objective of such a service is to keep it alive as long as possible.</p>
+<p>So, we will add such a password to be able to modify the Git repository and
+notify our DNS server of such a change so that it can &quot;fetch&quot;/&quot;pull&quot; the
+repository and update the zone file.</p>
+<pre><code class="language-sh">$ dd if=/dev/urandom bsd=32 count=1|base64 -
+s1/eSOziiA+rvScunET9G9sEB6bDcIrHb/HdE2wexhE=
+$ cat &gt;x25519.net._keys &lt;&lt;EOF
+personal._update.x25519.net. DNSKEY 0 3 163 PAPPkecDvEBnhqTzG5Xsbrbi7W0QY7TpVaEMxndMv2M=
+EOF
+$ git add .
+$ git commit -m &quot;Insert x25519.net&quot;
+$ git push
+$ cd $HOME
+</code></pre>
+<p>At last we can really deploy our server. In our series of articles, we will have
+to modify the zone file a little bit but, thanks to the update mechanism, we
+will not need to restart our server.</p>
+<p>Note that the script to run the unikernel uses the <code>ssh.key</code> file. This is the
+file in which we have saved our &quot;in the fly&quot; SSH key.</p>
+<pre><code class="language-sh">$ wget https://builds.robur.coop/job/dns-primary-git/build/latest/f/bin/primary-git.hvt
+$ cat &gt;primary-git.sh &lt;&lt;EOF
+#!/bin/bash
+
+albatross-client-local create --mem=256 --net=service:service primary-git \
+  primary-git.hvt --restart-on-fail \
+  --arg=&quot;--axfr&quot; \
+  --arg=&quot;--ipv4=10.0.0.3/24&quot; \
+  --arg=&quot;--ipv4-gateway=10.0.0.1&quot; \
+  --arg=&quot;--ssh-key=ed25519:$(head -n1 ssh.key | cut -d' ' -f4)&quot; \
+  --arg=&quot;--remote=git@10.0.0.1:zone.git&quot;
+EOF
+$ chmod +x primary-git.sh
+$ dig +short x25519.net @10.0.0.3
+76.8.60.93
+</code></pre>
+<p>All that remains is to allow the outside to communicate with our primary DNS
+server. To do this, we will use <code>iptables</code>. Note that our last rule only allowed
+unikernels to communicate with the outside. Now we need to redirect some packets
+to our unikernels: in particular those arriving on port <code>76.8.60.93:53</code>.</p>
+<pre><code class="language-sh">$ iptables -t nat -N PRIMARY-GIT
+$ iptables -t nat -A PRIMARY-GIT ! -s 10.0.0.3/32 -p tcp -m tcp --dport 53 \
+  -j DNAT --to-destination 10.0.0.3:53
+$ iptables -t nat -A PRIMARY-GIT ! -s 10.0.0.3/32 -p udp -m udp --dport 53 \
+  -j DNAT --to-destination 10.0.0.3:53
+$ iptables -t nat -A PREROUTING -m addrtype --dst-type LOCAL -j PRIMARY-GIT
+</code></pre>
+<p>On another machine, we can test the transfer mechanism that Gandi will use:</p>
+<pre><code class="language-sh">$ dig +short -t axfr x25519.net @76.8.60.93
+ns1.x25519.net. hostmaster.x25519.net. 1 86400 7200 1048576 3600
+ns6.gandi.net.
+ns1.x25519.net.
+76.8.60.93
+76.8.60.93
+ns1.x25519.net. hostmaster.x25519.net. 1 86400 7200 1048576 3600
+</code></pre>
+<p><strong>Warning</strong>: The transfer operation (and the change of authority from your
+provider to our primary DNS server) may take some time. Don't expect a simple
+<code>dig +short x25519.net</code> to work immediately.</p>
+<h4 id="how-to-update-my-primary-git"><a class="anchor" aria-hidden="true" href="#how-to-update-my-primary-git"></a>How to update my <code>primary-git</code>?</h4>
+<p>The DNS stack offered by <a href="https://github.com/mirage/ocaml-dns/">mirage</a> provides tools including one to
+notify the unikernel that it needs to resynchronise with the Git repository:
+<code>onotify</code>.</p>
+<pre><code class="language-sh">$ opam install dns-cli
+$ cat &gt;update.sh &lt;&lt;EOF
+#!/bin/bash
+
+eval $(opam env)
+onotify 10.0.0.3 x25519.net \
+  --key=personal._update.x25519.net:SHA256:PAPPkecDvEBnhqTzG5Xsbrbi7W0QY7TpVaEMxndMv2M=
+EOF
+$ chmod +x update.sh
+$ ./update.sh
+notifying to 10.0.0.3:53 zone x25519.net serial 1
+successful TSIG signed notify!
+</code></pre>
+<p>And that's it! An <strong>important note</strong> when editing your zone file is the serial
+number (here <code>1</code>). For each modification/addition, you must increment this
+number otherwise these modifications will not be taken into account by the other
+DNS servers. But we will see that in time.</p>
+<hr />
+<p>Hannes gave me a better way to update your zone file without you needing to
+install <code>dns-cli</code> (which can take a while given the machine we have). Indeed,
+the update mechanism can be done with <code>dig</code>:</p>
+<pre><code class="language-sh">$ dig SOA x25519.net @10.0.0.3 +opcode=notify -y \
+  hmac-sha256:personal._update:PAPPkecDvEBnhqTzG5Xsbrbi7W0QY7TpVaEMxndMv2M=
+</code></pre>
+<h3 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h3>
+<p>We finally deployed what will be essential for our unikernels and emails, our
+domain name. For feedback, this is perhaps the oldest unikernel I'm actively
+using!</p>
+<p>This is perhaps the most important element in the deployment of any service.
+Indeed, when it comes to websites, services like Bob, OpenVPN, etc. the domain
+name remains your central identity on Internet.</p>
+<p>Indeed, behind this identity, all your services will be articulated (as it is
+the case for <code>osau.re</code>). The design is very pleasant: a very small unikernel
+(11Mb) to manage a domain name as a full operating system with a Git history of
+all changes made to the zone file, this ensures traceability and trust but above
+all a reappropriation of such a basic but essential service for a small fee
+(again, the VPS costs only ~ 8$... and other services will follow).</p>
+<p>In the second part, we will focus on sending emails! This part will allow us to
+solve two problems:</p>
+<ol>
+<li>how to send an email to a Gmail and not get spammed (we will realize that,
+once again, the DNS service becomes central)</li>
+<li>how to manipulate TLS certificates from services like Let's encrypt and send
+emails securely</li>
+</ol>
+<p>I would like to mention that Hannes also made <a href="https://hannes.nqsb.io/Posts/DnsServer">an article</a>
+explaining the deployment of a primary DNS server here. The big difference is
+the slightly more practical case here, especially on details like &quot;Glue
+records&quot;. Anyway, as far as my services but also Robur's are concerned, again,
+this is perhaps the oldest unikernel used. Reason enough to go ahead and use
+MirageOS!</p>
+<p>The next article is available <a href="smtp_2.html">here</a>!</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

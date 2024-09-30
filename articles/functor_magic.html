@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteFunctor, Application and magick!
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Functor, Application and magick!</h1>
+    <ul class="tags-list"><li>OCaml</li><li>tip</li></ul><p>While I try to make an SMTP server in OCaml as an <em>unikernel</em>, I tried to deal
+with <code>Set.Make</code>. Imagine a situation where you define your type <code>elt = string</code>
+into a module <code>A</code> and you want to apply <code>Set.Make</code> inside the given module.</p>
+<h2 id="interface"><a class="anchor" aria-hidden="true" href="#interface"></a>Interface</h2>
+<p>Then, you would like to write a proper interface which describe result of your
+<em>functor</em>. It should be easy than:</p>
+<pre><code class="language-ocaml">type elt = string
+
+include Set.S with type elt = elt
+</code></pre>
+<p>But in my example, ~Set.S~ wants to (re)define <code>elt</code>. You probably miss the
+<a href="https://caml.inria.fr/pub/docs/manual-ocaml/manual030.html#sec252">destructive substitution</a> of the type <code>elt</code>.</p>
+<pre><code class="language-ocaml">type elt = string
+
+include Set.S with type elt := elt
+</code></pre>
+<h2 id="implementation"><a class="anchor" aria-hidden="true" href="#implementation"></a>Implementation</h2>
+<p>The implementation will be more trickier. Indeed, we probably want to do
+something like this:</p>
+<pre><code class="language-ocaml">include Set.Make(struct type t = string let compare = String.compare end)
+</code></pre>
+<p>And, fortunately for you, this snippet should work. However, it starts to be
+pretty incomprehensible when <code>type elt</code> is one of your type (<code>string</code> or
+<code>String.t</code> exists outside the scope of your module). We can take this example:</p>
+<pre><code class="language-ocaml">include Set.Make(struct
+  type t = { v : string }
+  let compare { v= a; } { v= b; } = String.compare a b
+end)
+</code></pre>
+<p>Into the interface, by side the redefinition of the type <code>elt</code>, nothing should
+change. However, the compilation fails with:</p>
+<pre><code class="language-sh">$ ocamlc -c a.ml
+Error: The implementation a.ml does not match the interface a.cmi:
+       Type declarations do not match:
+         type elt
+       is not included in
+         type elt = { v : string; }
+</code></pre>
+<p>Indeed, we should have a definition of <code>elt</code> outside the <code>struct ... end</code>:</p>
+<pre><code class="language-ocaml">type elt = { v : string }
+
+include Set.Make(struct
+  type t = elt
+  let compare { v= a; } { v= b; } = String.compare a b
+end)
+</code></pre>
+<p>However, now, OCaml complains about a multiple definition of the type <code>elt</code>.
+May be we can play more with the destructive substitution?</p>
+<pre><code class="language-ocaml">type elt = { v : string }
+
+include
+  (Set.Make(struct
+     type t = elt
+     let compare { v= a; } { v= b; } = String.compare a b
+   end)
+   : Set.S with type elt := elt)
+</code></pre>
+<p>And it's work!</p>
+<h2 id="just-a-tip"><a class="anchor" aria-hidden="true" href="#just-a-tip"></a>Just a tip</h2>
+<p>So I leave this trick here to help some people.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

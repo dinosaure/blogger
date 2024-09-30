@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteRelease cycle about SMTP stack
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Release cycle about SMTP stack</h1>
+    <ul class="tags-list"><li>OCaml</li><li>MirageOS</li><li>SMTP</li><li>libraries</li></ul><p>If you follow a bit my work, you should know about a huge work started few
+months (years?!) ago about the SMTP stack. As a MirageOS developer, I mostly
+want to use it to replace some usual services such as a DNS resolver, a blog or
+a <a href="https://hannes.nqsb.io/Posts/DnsServer">primary DNS service</a>.</p>
+<p>But I really would like to replace an old but widely used service, the email
+service.</p>
+<h2 id="mr-mime-at-the-beginning"><a class="anchor" aria-hidden="true" href="#mr-mime-at-the-beginning"></a>Mr. MIME at the beginning</h2>
+<p>One of my biggest project is <a href="https://github.com/mirage/mrmime">mrmime</a>. It's a <em>little</em> library to parse
+and generate an email according several RFCs. The most difficult part was to
+handle <em>encoding</em> and <em>multipart</em>.</p>
+<p>This library wants to solve 2 simple problems:</p>
+<ul>
+<li>How to read/introspect an email</li>
+<li>How to generate an email with OCaml</li>
+</ul>
+<h3 id="how-to-read-everything"><a class="anchor" aria-hidden="true" href="#how-to-read-everything"></a>How to read everything!</h3>
+<p>An email is easily understandable by a human as a <em>rich document</em> but it can be
+hard to extract useful information from it by a computer. Indeed, an email can
+be really complex such as a <a href="https://tools.ietf.org/html/rfc822">RFC822</a>'s date or, more obviously who
+should receive the email.</p>
+<p>Mr. MIME wants to solve this first problem and it provides an
+<a href="https://github.com/inhabitedtype/angstrom">angstrom</a> parser to extract <em>metadata</em> and represent them by OCaml
+values. Then, the user is able to introspect them and implement something like
+a /filter/, an organizer, etc.</p>
+<h4 id="fws-and-unstrctrd"><a class="anchor" aria-hidden="true" href="#fws-and-unstrctrd"></a>FWS and <code>unstrctrd</code></h4>
+<p>The main problem about email is the <em>folding-whitespace</em>. It permits the user
+to extend a value of a field to multiple lines such as:</p>
+<pre><code class="language-text">To: A Group(Some people)
+   :Chris Jones &lt;c@(Chris's host.)public.example&gt;,
+     joe@example.org,
+ John &lt;jdoe@one.test&gt; (my dear friend); (the end of the group)&quot;
+</code></pre>
+<p>As long as the next line starts with a <em>whitespace</em>, it's a part of the current
+value. At the first time, I tried to <em>parse</em> it with <code>ocamllex</code> but I failed
+when I got a <code>too big automaton</code> error. Then, I switched to <code>angstrom</code> but I
+was not really happy with results.</p>
+<p>Recently, with @let-def, we agreed that an <code>ocamllex</code> still is possible. At the
+end, we should be more faster than <code>angstrom</code>. So we did
+<a href="https://github.com/mirage/unstrctrd">unstrctrd</a>. The project is a bit more general than emails. In fact,
+some formats such as some used by Debian or HTTP/1.1 headers follow the same
+rule. <code>unstrctrd</code> wants to <em>flat</em> kind of value.</p>
+<p>Into details, <code>unstrctrd</code> is a nice mix between <code>ocamllex</code> and <code>angstrom</code>.</p>
+<p>With this project, we handle <code>FWS</code> described by RFC5322 and obsolete form
+described by RFC822. It does some post-processes (like it removes useless
+comments as described by <code>CFWS</code>) and provides a well abstracted API to be able
+to parse and construct an <code>unstructured</code> form.</p>
+<p>To understand the babel tower, any values available into your email as the
+date, email addresses or subject of your email should respect, at least, the
+<code>unstructured</code> form. Any of them will be processed, at least, by <code>unstrctrd</code>.</p>
+<p>The goal is to hide such complexity to an other lower layer. In fact, before
+this library, 2 of mine libraries want to solve this problem:</p>
+<ul>
+<li><a href="https://github.com/dinosaure/emile">emile</a> to parse email addresses</li>
+<li>and of course, <code>mrmime</code></li>
+</ul>
+<p>To be able to provide as much as possible light libraries, we did <code>unstrctrd</code>
+and delete <code>FWS</code> handler from <code>emile</code>. By that, <code>mrmime</code> depends on both to
+properly parse email addresses.</p>
+<h4 id="an-email-address-and-emile"><a class="anchor" aria-hidden="true" href="#an-email-address-and-emile"></a>An email address and <code>emile</code></h4>
+<p>As you know, we use widely email addresses but the format of them is really
+<strong>complex</strong>. We can put more than one domain on it for example (like
+<code>&lt;@gmail.com:romain.calascibetta@x25519.net&gt;</code>), put a name (which must respect a
+special format), use special characters such as <code>+</code> or spaces with
+<em>quoted-string</em>. A domain can directly be an IPv4 or IPv6 or an <em>extensible</em>
+domain locally specified by the SMTP server. You can use UTF-8 of course since
+<a href="https://tools.ietf.org/html/rfc6532">RFC6532</a>.</p>
+<p>In other words, email addresses are <a href="https://github.com/dinosaure/emile/blob/master/test/test.ml">hard</a> to parse.</p>
+<p>With <code>unstrctrd</code>, we simplify a bit the library and <code>emile</code> does not handle
+anymore <code>FWS</code>. The goal is to let the user to process the input with
+<code>unstrctrd</code> at first if the input comes from an email and then try to parse the
+result with <code>emile</code> to extract the email address - and this is what <code>mrmime</code>
+does of course.</p>
+<p>And, of course, usual user does not care about <em>folding-whitespace</em>. The input
+comes usually from a form (so, without this such token), so <code>emile</code> wants to
+provide the most easy (and correct) way to parse an email address.</p>
+<h4 id="utf-8-utf-7-latin1-or-yuscii"><a class="anchor" aria-hidden="true" href="#utf-8-utf-7-latin1-or-yuscii"></a>UTF-8, UTF-7, latin1 or <a href="https://en.wikipedia.org/wiki/YUSCII">YUSCII</a>?</h4>
+<p>An other obvious problem about email is the <em>encoding</em> used. We talk sometimes
+about <em>charset</em> but let keep <em>encoding</em>. Of course, we have several <em>encoding</em>
+such as ISO-8859. With a nice discussion with @dbuenzli with beers, the most
+interesting way to solve the problem about <em>encoding</em> is to arbitrary choose
+one and keep it as long as we can.</p>
+<p>So, as the <a href="https://github.com/dbuenzli/uutf">uutf</a> author, we chosen UTF-8 of course!</p>
+<p>However, we need to provide a way to <em>normalize</em> any <em>encodings</em> to UTF-8. The
+Unicode consortium provides some <a href="ftp://ftp.unicode.org/Public/MAPPINGS/">translation tables</a> and I
+picked them to be able to translate some of them to UTF-8. Few projects was
+made in this goal:</p>
+<ul>
+<li><a href="https://github.com/mirage/uuuu">uuuu</a> to handle ISO-8859 encoding</li>
+<li><a href="https://github.com/mirage/coin">coin</a> to handle KOI8 encoding</li>
+<li>and the most important, <a href="https://en.wikipedia.org/wiki/YUSCII">yuscii</a> to handle
+<a href="https://crawshaw.io/blog/utf7">the famous UTF-7 encoding</a></li>
+</ul>
+<p>All of them are merged into an other library: <a href="https://github.com/mirage/rosetta">rosetta</a>.</p>
+<p>This library is used by <code>mrmime</code> to try to <em>normalize</em> any contents to UTF-8.
+From the point of view of the user, he does not need to know all details. The
+result is just to say: any contents provided by <code>mrmime</code> use UTF-8!</p>
+<p>An other OCaml project to handle such things exists: <a href="https://github.com/yoriyuki/Camomile">Camomile</a>. But
+<code>rosetta</code> wants to be the most easier and simpler as we want.</p>
+<h4 id="base64--quoted-printable"><a class="anchor" aria-hidden="true" href="#base64--quoted-printable"></a>Base64 &amp; Quoted-Printable</h4>
+<p><code>mrmime</code> still wants to be low-level. Even if it wants to extract contents, it
+does not handle <em>format</em> of contents (this feature should be done by a new
+other project <a href="https://github.com/dinosaure/conan/">conan</a> - but we will talk about it in another article).</p>
+<p>However, <a href="https://tools.ietf.org/html/rfc2045">RFC2045</a> defines some <em>standalone</em> formats independently to
+the type of the content. The most know is the <a href="https://github.com/mirage/ocaml-base64">base64</a> to
+encode binary or large files into your email. It's when I discovered that email
+has his own base64 <em>format</em> that I to deeply <a href="https://tarides.com/blog/2019-02-08-release-of-base64">update</a> the
+package. decoder of this <em>special</em> format.</p>
+<p>In other side, RFC2045 describes an other <em>format</em>: the quoted-printable
+format. At this time, it was not possible to safely send an UTF-8 email. We
+still were constrained to encode each byte of our email into <a href="https://en.wikipedia.org/wiki/8-bit_clean">7-bits</a>.
+To ensure to be able to pass 8-bits values, the quoted-printable was done to
+encode such byte into a special form.</p>
+<p>From that, we did the library <a href="https://github.com/mirage/pecu">pecu</a> which is able to encode and decode
+such contents. This library was well tested with <a href="https://github.com/mirage/pecu/blob/master/fuzz/iso.ml"><em>fuzzer</em></a> as we
+do usually to check <em>isomorphism</em> between encoder and decoder.</p>
+<p>Some others formats exist and are created specially for emails such as the
+<a href="https://tools.ietf.org/html/rfc2646"><em>flowed</em> format</a> but they should be handle by others libraries.</p>
+<h3 id="how-to-generate-everything"><a class="anchor" aria-hidden="true" href="#how-to-generate-everything"></a>How to generate everything</h3>
+<p>The major feature about <code>mrmime</code> is not really about all of these libraries
+used to parse an email. Indeed, <code>mrmime</code> was able to introspect emails at the
+beginning (from that, we can look into <a href="https://www.youtube.com/watch?v=kQkRsNEo25k">an old conference</a> about
+it). The notable update is the <em>safe</em> way to emit an email.</p>
+<p>Indeed, a large work was done about API to be able to properly emit an email
+and try to respect as much as we can rules such as:</p>
+<ul>
+<li><em>folding-whitespace</em></li>
+<li>80-columns rule</li>
+<li><code>base64</code> and quoted-printable encoding</li>
+<li><em>multipart</em></li>
+</ul>
+<p>From that, I think we provide a nice interface to construct and emit an email.
+Generation of email address for example is pretty-close to what we expect:</p>
+<pre><code class="language-ocaml">let me =
+  Local.[ w &quot;romain&quot;; w &quot;calascibetta&quot; ]
+        @ Domain.(domain, [ a &quot;x25519&quot;; a &quot;net&quot; ]) ;;
+</code></pre>
+<p>Composition with <em>parts</em> is also nice:</p>
+<pre><code class="language-ocaml">let content_type_alternative =
+  let open Content_type in
+  (with_type `Multipart &lt;.&gt; with_subtype (`Iana &quot;alternative&quot;)) default
+
+let header =
+  Header.empty
+  |&gt; Header.add Field_name.content_type (Field.Content, content_type_alternative)
+
+let part0 = Mt.part (stream_of_string &quot;Hello World!&quot;)
+let part1 = Mt.part (stream_of_string &quot;Salut le monde!&quot;)
+let m0 = Mt.multipart ~header [ part0; part1; ] |&gt; Mt.multipart_as_part
+
+let m1 = Mt.part stream_of_file
+let m = Mt.(make multi (multipart [ m0; m1; ]))
+</code></pre>
+<p>Then, <code>mrmime</code> handles 80 columns such as when it reaches the limit, it tries
+to break with a <code>FWS</code> token the value where is permitted such as:</p>
+<pre><code class="language-rfc822">To: thomas@gazagnaire.org, anil@recoil.org, hannes@mehnert.org, gemma.t.gordon@gmail.com
+</code></pre>
+<p>becomes:</p>
+<pre><code class="language-rfc822">To: thomas@gazagnaire.org, anil@recoil.org, hannes@mehnert.org,
+  gemma.t.gordon@gmail.com
+</code></pre>
+<h2 id="smtp-then"><a class="anchor" aria-hidden="true" href="#smtp-then"></a>SMTP then!</h2>
+<p>Of course, even if some people are really interested by <code>mrmime</code> mostly to pave
+a way to be able to create yet another email client (in OCaml!), my goal is a
+bit offbeat. So I mostly focused on the implementation of a SMTP server.</p>
+<p>The first notable library is <a href="https://github.com/mirage/colombe.git">colombe</a> - a low-level implementation of
+the SMTP protocol.</p>
+<h3 id="how-to-describe-a-state-machine"><a class="anchor" aria-hidden="true" href="#how-to-describe-a-state-machine"></a>How to describe a state machine?!</h3>
+<p>The real goal of <code>colombe</code> is to provide an API which is able to let the user
+to describe a state machine to communicate to a peer. By this fact, <code>colombe</code>
+does not want to implement the <code>sendmail</code> command or does not want to implement
+a SMTP relay or a SMTP submission service.</p>
+<p>It is the first stone to be able to easily create such programs/libraries.</p>
+<p>So most of people should not care about <code>colombe</code> - as they mostly want to send
+an email. However, as a client such as ~sendmail~ or as a server such as an
+SMTP submission service, they should use the same ground and avoid a duplicate
+an implementation of how to talk SMTP with a peer.</p>
+<p>Another point is the possibility to use <code>colombe</code> with MirageOS - and make an
+unikernel with it. From that, we started to use an other kind of abstraction of
+I/O (such as <a href="https://github.com/ocsigen/lwt">LWT</a> or <a href="https://github.com/janestreet/async">ASYNC</a> - or <code>Unix</code>) which uses less
+<em>functor</em> as we do usually with MirageOS.</p>
+<p>But the real good point of <code>colombe</code> is the ability to describe the state
+machine with <em>monad</em> which provides high-level <code>recv</code> and <code>send</code> operations:</p>
+<pre><code class="language-ocaml">let properly_quit_and_fail ctx err =
+  let* _txts = send ctx QUIT () &gt;&gt;= fun () -&gt; recv ctx PP_221 in
+  fail err
+
+let authentication ctx username password =
+  let* code, txts = send ctx AUTH PLAIN &gt;&gt;= fun () -&gt; recv ctx CODE in
+  match code with
+  | 504 -&gt; properly_quit_and_fail ctx `Unsupported_mechanism
+  | 538 -&gt; properly_quit_and_fail ctx `Encryption_required
+  | 534 -&gt; properly_quit_and_fail ctx `Weak_mechanism
+  | 334 -&gt;
+    let* () = match txts with
+      | [] -&gt;
+        let payload = Base64.encode_exn (Fmt.strf &quot;\000%s\000%s&quot; username password) in
+        send ctx PAYLOAD payload
+      | x :: _ -&gt;
+        let x = Base64.decode_exn x in
+        let payload = Base64.encode_exn (Fmt.strf &quot;%s\000%s\000%s&quot; x username password) in
+        send ctx PAYLOAD payload in
+    ( recv ctx CODE &gt;&gt;= function
+        | (235, _txts) -&gt; return `Authenticated
+        | (501, _txts) -&gt; properly_quit_and_fail ctx `Authentication_rejected
+        | (535, _txts) -&gt; properly_quit_and_fail ctx `Authentication_failed
+        | (code, txts) -&gt; fail (`Unexpected_response (code, txts)) )
+  | code -&gt; fail (`Unexpected_response (code, txts))
+</code></pre>
+<p>As you can see, we use <a href="https://jobjo.github.io/2019/04/24/ocaml-has-some-new-shiny-syntax.html">monadic operators</a> to simplify the
+lecture of the code. <code>send</code> and <code>recv</code> take values described by the user with a
+GADT:</p>
+<pre><code class="language-ocaml">type 'x send =
+  | QUIT : unit send
+  | AUTH : auth send
+  | PAYLOAD : string send
+
+type 'x recv =
+  | PP_220 : string list recv
+  | PP_221 : string list recv
+  | CODE : (int * string list) recv
+</code></pre>
+<p>Then, the user just needs to describe how to process such commands with a given
+<code>ctx</code>:</p>
+<ul>
+<li>how to <em>send</em> <code>'x recv</code> to the <code>ctx</code></li>
+<li>how to <em>recv</em> <code>'x send</code> from the <code>ctx</code></li>
+</ul>
+<p>Of course, this where <code>colombe</code> comes. It already defines few <em>primitives</em> to
+emit and parse such commands into the <code>ctx</code>.</p>
+<p>At another layer (which needs <em>syscalls</em>), a composition between the <code>ctx</code> and
+a <code>fiber</code> (like <code>authentication</code>) returns a process <code>t</code> such as:</p>
+<pre><code class="language-ocaml">type ('a, 'err) t =
+  | Read   of { buffer : bytes
+              ; off : int
+              ; len : int
+              ; k : int -&gt; ('a, 'err) t }
+  | Write  of { buffer : string
+              ; off : int
+              ; len : int
+              ; k : int -&gt; ('a, 'err) t }
+  | Return of 'a
+  | Fail   of 'err
+
+let run socket username password =
+  let ctx = Context.create () in
+  let fiber = authentication ctx username password in
+
+  let rec go = function
+    | Read { buffer; off; len; k; } -&gt;
+      let len = Unix.read socket buffer off len in
+      go (k len)
+    | Write { buffer; off; len; k; } -&gt;
+      let len = Unix.write socket buffer off len in
+      go (k len)
+    | Return v -&gt; Ok v
+    | Fail err -&gt; Error err in
+  go m
+</code></pre>
+<p>And you have a fully implemented and available way on <code>Unix</code> to communication
+with a SMTP peer - and be authenticated.</p>
+<h3 id="implement-sendmail-the-client-side"><a class="anchor" aria-hidden="true" href="#implement-sendmail-the-client-side"></a>Implement <code>sendmail</code>, the client side</h3>
+<p>At least, from this core, it should be easy to implement <code>sendmail</code> command.
+And of course, the distribution of <code>colombe</code> provide such library:</p>
+<ul>
+<li><code>sendmail</code> which is free about lwt, async or unix</li>
+<li><code>sendmail.tls</code> which uses <code>STARTTLS</code></li>
+<li><code>sendmail-lwt</code> a specialisation of <code>sendmail</code> with lwt</li>
+</ul>
+<p>All of them wants to provide the most easy way to send an email. Indeed, it
+exists 2 ways to submit an email:</p>
+<ul>
+<li>over a TLS flow available on <code>*:465</code></li>
+<li>over a simple TCP flow but mostly of them require to start a TLS flow
+<em>in-the-fly</em> on <code>*:587</code> with <code>STARTTLS</code></li>
+</ul>
+<h4 id="facteur"><a class="anchor" aria-hidden="true" href="#facteur"></a><code>facteur</code></h4>
+<p>From all of that, we developed a little <em>proof-of-concept</em> to see if <code>colombe</code>
+and <code>sendmail</code> correspond to what we expect: <a href="https://github.com/dinosaure/facteur/">facteur</a>.</p>
+<p>This is a simple tool which wants to send an email as the <code>sendmail</code> command
+but the complete stack is in OCaml! It's a merge of <code>mrmime</code> and <code>sendmail</code> to
+be able to produce a well formed email with file attachments.</p>
+<p>It still is an experimental software and it requires a bad dependency
+<a href="https://linux.die.net/man/5/magic">libmagic</a> to be able to recognise MIME type of file attachments.
+However, I started to implement something else, <a href="https://github.com/dinosaure/conan/">conan</a>, to
+automatically do this job and be MirageOS compatible.</p>
+<h3 id="server-side"><a class="anchor" aria-hidden="true" href="#server-side"></a>Server side</h3>
+<p>Finally, I started to implement the server side. <code>colombe</code> handles both side.
+It can parse response and emit request and /vice-versa/. From the same ground,
+we try to implement 2 servers into a single project: <a href="https://github.com/dinosaure/ptt">ptt</a>.</p>
+<p>It provides two libraries:</p>
+<ul>
+<li><code>lipap</code> which is an SMTP submission server</li>
+<li><code>mti-gf</code> which is an SMTP relay server</li>
+</ul>
+<p>The final goal of them is to provide a full stack to be able to create email
+addresses from a given domain. An example is may be more interesting, we will
+take my <code>x25519.net</code>.</p>
+<p>We will provide a first SMTP relay which will receive any incoming emails. It
+will be the server notified by my primary DNS server with the <code>MX</code> record.</p>
+<pre><code class="language-sh">$ dig +short MX x25519.net
+0 163.172.65.89
+</code></pre>
+<p>The goal of it is to transmit incoming email to the real destination. For
+example, you want to send me an email to <code>romain@x25519.net</code> from your
+<code>gmail.com</code> address. Google will speak with this server. Internally, I
+associated <code>romain@x25519.net</code> to <code>romain.calascibetta@gmail.com</code>. Finally,
+<code>mti-gf</code> will <em>retransmit</em> your email to Google (to
+<code>romain.calascibetta@gmail.com</code>).</p>
+<p>The second server let us to use our <code>x25519.net</code> email address to send email.
+The goal is to properly configure your <a href="https://fr.wikipedia.org/wiki/Mail_Transfer_Agent">MUA</a> to be able to be
+authenticated to our <code>lipap</code> server. Then, it is able to communicate to others
+SMTP servers such as Google and send your email to them (with your
+<code>x25519.net</code> address).</p>
+<p>So from my experiments, all should work and I started to deploy some others
+unikernels mostly to get automatically <a href="https://letsencrypt.org/">let's encrypt</a>
+certificates - and provide <code>163.172.65.89:587</code> and <code>163.172.65.89:465</code>.</p>
+<h3 id="other-projects"><a class="anchor" aria-hidden="true" href="#other-projects"></a>Other projects</h3>
+<p>Along my way, I surely developed some others tools (which need an update with
+new interfaces or are really experimental) such as:</p>
+<ul>
+<li><a href="https://github.com/dinosaure/ocaml-dkim">ocaml-dkim</a> to verify DKIM fields from an email</li>
+<li><a href="https://github.com/mirage/colombe.git">received</a> to generate a graph from <code>Received:</code> fields from an email
+or generate one of them</li>
+</ul>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>The stack is huge and it is not really finished. But I believe that I reached a
+point where all libraries compose nicely and let me to provide something much
+more complex such as an SMTP server!</p>
+<p>All of that is possible of course with the work from others peoples such as
+<a href="https://github.com/mirleft/ocaml-tls">ocaml-tls</a> or, more generally, MirageOS people.</p>
+<p>I believe that this year will be the year where such service will be exist as a
+MirageOS unikernel! And may be do an anarchist revolution and do a self
+re-appropriation of the means of production.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

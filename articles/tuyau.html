@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteTuyau, the next conduit
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Tuyau, the next conduit</h1>
+    <ul class="tags-list"><li>MirageOS</li><li>Protocols</li><li>Libraries</li><li>Functoria</li><li>OCaml</li></ul><p>If you look into the MirageOS ecosystem, you should already see
+<a href="https://github.com/mirage/ocaml-conduit.git">conduit</a> as a library used by many others projects such as
+<a href="https://github.com/mirage/ocaml-cohttp.git">cohttp</a>. However, even if it is used by these projects, at this time,
+nobody can really explain the goal of Conduit.</p>
+<p>Conduit wants to solve 2 problems:</p>
+<ul>
+<li>Start a <em>transmission</em> from an URI or, more generally, an <em>endpoint</em></li>
+<li>Be able to compose <em>protocols</em></li>
+</ul>
+<p>At this stage, it's mostly a pain to use Conduit for several reasons. But one
+of them is the lack of documentation. Conduit still exists because people
+copy/paste some piece of codes available in some projects.</p>
+<p>However, to understand how Conduit can resolve your URI and give you a way to
+communicate to your peer, nobody understands how to extend it, how to trace it
+and finally how to use it.</p>
+<p>From that, one year ago (at the MirageOS retreat), we decided to make a new
+version of Conduit: Tuyau (french word for a <em>pipe</em>). Of course, we don't want
+to repeat errors of the past. This article want to describe Conduit, and, by
+this way, Tuyau.</p>
+<p>It can be a good opportunity to see some strange OCaml things!</p>
+<h2 id="start-a-transmission"><a class="anchor" aria-hidden="true" href="#start-a-transmission"></a>Start a <em>transmission</em></h2>
+<p>In many ways, in some projects, we want to start a <em>transmission</em> with a peer.
+We would like to communicate with it. However, we don't want to handle by hands
+details to start this transmission. We can take an easy example with
+<a href="https://github.com/mirage/ocaml-git.git">ocaml-git</a>.</p>
+<p>When we want to push/pull to an other peer, we have 4 possibilities:</p>
+<ul>
+<li>Use directly the Smart (Git) protocol over TCP/IP. It appears when you do:
+<code>git clone git://host/repo</code></li>
+<li>Use the Smart (Git) protocol over SSH. It's the usual case when you do:
+<code>git clone git@host:repo</code></li>
+<li>Use the Smart (Git) protocol over HTTP. It's when you do:
+<code>git clone http://host/repo</code></li>
+<li>And final case is over HTTP + TLS or, in other words, HTTPS:
+<code>git clone https://host/repo</code></li>
+</ul>
+<p>For all of these cases, we use systematically the same Smart protocol to
+communicate with a peer<sup><a href="#fn1">1</a></sup>. So we should abstract all of these cases
+behind something like a common interface.</p>
+<p>Another aspect is from the point of view of the maintainer of Git:</p>
+<ul>
+<li>we don't want to depend on all of these protocols</li>
+<li>it's sane to not be aware about underlying implementation</li>
+</ul>
+<p>The first point is really important. Git is only about Git and we should not
+depend on a specific implementation of HTTP or a specific implementation of
+SSH. The current version of Git did the choice to use Curl to be able to
+communicate with the HTTP protocol. We should be able to be abstracted from
+that in OCaml and let the user to choose which implementation of HTTP he/she
+wants.</p>
+<p>The best is to start a transmission and let the user, at another layer, to
+<em>feed</em> something which aggregate implementation of protocols. By this way, we
+can let the user to <em>feed</em> Tuyau <em>only</em> with an SSH implementation and, by this
+way, ensure that Git will start a <em>transmission</em> only with SSH.</p>
+<p>The second point is not really valid when we can argue some security points. As
+a maintainer, we would be able to enforce a transmission over TLS for example.
+But we will see later how we can solve that into Tuyau.</p>
+<p>Finally, we want something like:</p>
+<pre><code class="language-ocaml">val resolve : Tuyau.t -&gt; uri -&gt; Unix.socket
+</code></pre>
+<p>Where <code>Unix.socket</code> is already connected to our peer. Then, we can start to
+<code>Unix.read</code> and <code>Unix.write</code> on the given socket and speak with the Smart
+protocol to our peer.</p>
+<p><code>Tuyau.t</code> represents globally our possibilities (our available protocols). At
+least, the user should depend on that - but it does not imply a dependence to
+implementation of available protocols.</p>
+<p><tag id="fn1"><strong>1</strong></tag>: It's not really true when a transmission over HTTP
+must be <em>stateless</em>. Smart over SSH differs too when it must expect a
+END-OF-LINE (<code>'\n'</code>) at the end of each <em>packet</em> - this character is optional
+over TCP/IP.</p>
+<h2 id="a-transmission-a-protocol-or-a-flow"><a class="anchor" aria-hidden="true" href="#a-transmission-a-protocol-or-a-flow"></a>A transmission, a protocol or a flow</h2>
+<p>The first bad point of Conduit is terms used by it which are not really
+defined. A transmission, a protocol or a flow are not very clear and we can not
+strictly define the purpose of them with Conduit.</p>
+<p>Tuyau wants to be clear on these words and it gives to us a true definition of
+them. Then, we will use them as Tuyau defines them.</p>
+<h3 id="a-protocol"><a class="anchor" aria-hidden="true" href="#a-protocol"></a>A Protocol</h3>
+<p>A communication protocol is a system of rules that allows entities to transmit
+information. In the case of Tuyau, this kind of information must not be
+arbitrary. The protocol should only solve communication problems such as
+<em>routing</em>.</p>
+<p>When we talk about a protocol, it's only about a standard which is able to
+transmit a <em>payload</em>. Interpretation of the <em>payload</em> is not done by the
+<em>protocol</em> but by the user of this library.</p>
+<p>For example, the Transmission Control Protocol (TCP) <em>is</em> a protocol according
+to Tuyau because it is able to transmit <em>payload</em> without interpreting it. A
+counter example is the Simple Mail Transfer Protocol (SMTP) which gives an
+interpretation of the <em>payload</em> (such as <code>EHLO</code> which is different to <code>QUIT</code>).</p>
+<p>This difference is important to unlock the ability to compose <em>protocols</em>. An
+other protocol according to Tuyau is Transport Layer Security (TLS) - which
+wants to solve privacy and data integrity. Tuyau is able to compose protocols
+together like TCP ∘ TLS to make a new protocol. From this composition, the user
+is able to implement Secure Simple Mail Transfer Protocol (SSMTP) or HyperText
+Transfer Protocol Secure (HTTPS) - both use TCP and TLS.</p>
+<h3 id="a-flow"><a class="anchor" aria-hidden="true" href="#a-flow"></a>A <code>FLOW</code></h3>
+<p>To be able to do this composition, the protocol must respect (at least) an
+interface: the <code>FLOW</code> interface. It defines an abstract <code>type t</code> and functions
+like <code>recv</code> or <code>send</code>. These functions give to us the <em>payload</em>. Rules to solve
+communication problems are already processed internally.</p>
+<p>In other terms, from a given <code>FLOW</code>, the user should not handle <em>routing</em>,
+privacy or data integrity (or some others problems). The user should only be
+able to process the <em>payload</em>.</p>
+<p>Finally, representation of a TCP protocol is a <code>FLOW</code>. VCHAN protocol or User
+Datagram Protocol (UDP) can be represented as a <code>FLOW</code>. However, TLS is not a
+flow as is but <em>a layer</em> on top of another protocol/<code>FLOW</code>. Composition with it
+should look like:</p>
+<pre><code class="language-ocaml">val with_tls : (module FLOW) -&gt; (module FLOW)
+</code></pre>
+<p>From a given <code>FLOW</code>, we <em>wrap</em> it with TLS and return a new <code>FLOW</code>. Such a
+composition exists also for <a href="https://en.wikipedia.org/wiki/WireGuard">WireGuard</a> or <a href="http://www.noiseprotocol.org/">Noise</a> layers.
+Tuyau wants to solve this composition by a strict OCaml interface of the
+<code>FLOW</code>.</p>
+<h3 id="about-conduit"><a class="anchor" aria-hidden="true" href="#about-conduit"></a>About Conduit</h3>
+<p>These ideas already exist with <code>Conduit_mirage.Flow</code> and
+<code>Conduit_mirage.with_tls</code>. However, it appears 2 problems:</p>
+<ul>
+<li>extension of implementations</li>
+<li>composition with user-defined <code>FLOW</code></li>
+</ul>
+<p>Currently, Conduit delimits implementations by a polymorphic variant
+<code>Conduit.{client,server}</code>. We should not blame that when
+<a href="https://caml.inria.fr/pub/docs/manual-ocaml/extensiblevariants.html">extensible variants</a> appears only on OCaml 4.02.</p>
+<h2 id="abstract-abstract-everything"><a class="anchor" aria-hidden="true" href="#abstract-abstract-everything"></a>Abstract! Abstract everything!</h2>
+<p>As we said, the most important idea is to be able to:</p>
+<ol>
+<li>abstract the <em>flow</em></li>
+<li>still be able to use it to receive and send <em>payload</em></li>
+</ol>
+<p>In your first example, we return an <code>Unix.socket</code> which is obviously not good,
+especially if we want to make an <em>unikernel</em> (which can not usually have
+anythings from the <code>Unix</code> module). In this way, we already did an interface to
+be able to easily abstract our implementations: <a href="https://github.com/mirage/mirage-flow">mirage-flow</a>.</p>
+<p>We say that any protocols like TCP or VCHAN can be described with this
+interface where we have the <code>recv</code> function and the <code>send</code> function. So,
+instead to return a concrete type, we return an abstract type like:</p>
+<pre><code class="language-ocaml">module type FLOW = sig
+  type t
+
+  val recv : t -&gt; bytes -&gt; int
+  val send : t -&gt; string -&gt; unit
+end
+
+type flow = Flow : 'flow * (module FLOW with type t = 'flow) -&gt; flow
+val resolve : Tuyau.t -&gt; uri -&gt; flow
+
+let () =
+  let Flow (flow, (module Flow)) =
+    resolve tuyau &quot;https://google.fr/&quot; in
+  Flow.send flow &quot;Hello World!&quot;
+</code></pre>
+<p>In our example, we use a GADT to keep the type equality between our value
+<code>'flow</code> and the <code>type t</code> of our module <code>Flow</code>. We usually call it an
+<em>existential type wrapper</em>. It allows us to <em>create</em> a new type <code>'flow</code> and
+associate it to an implementation <code>Flow</code>.</p>
+<p>The idea behind is: the <code>type t</code> can concretely be anything. It can be an
+<code>Unix.socket</code> if we want to make an <em>unikernel</em> for Unix but it can be
+something else like a <code>Tcpip_stack_direct.t</code> (the TCP/IP implementation usually
+used by MirageOS).</p>
+<p>With the associated module, we still continue to be able to read and write
+something as we can do with an <code>Unix.socket</code>.</p>
+<p>And of course, we can forget about details. You can denote that we already
+prepare the concrete value to be able to communicate with our peer. I mean,
+<code>resolve</code> do something more complex than just create a new resource such as an
+<code>Unix.socket</code>. It connects the socket to our peer. It's why we talk about
+a <em>resolution</em> process.</p>
+<h2 id="resolution"><a class="anchor" aria-hidden="true" href="#resolution"></a>Resolution</h2>
+<p>Tuyau can not define by itself the resolution. Resolution is commonly a DNS
+resolution to get the IP from a <em>domain-name</em>. However, into an <em>unikernel</em>,
+nothing ensures that we properly have a DNS resolver (such as our
+<code>/etc/resolv.conf</code>).</p>
+<p>In other side, definition of an <em>endpoint</em> can not fully exist where it depends
+on the returned <code>'flow</code>. For example, if we give to you a TCP/IP <code>Flow</code>, used
+<em>endpoint</em> to connect your <code>'flow</code> should be an IP and a <em>port</em>. However, the
+<em>endpoint</em> can represent something else like a <em>serial-port</em> connected to our
+MirageOS or a virtual network kernel interface (TUN/TAP), etc. Finally,
+definition of an <em>endpoint</em> is <em>intrinsic</em> to our implementation of the <code>Flow</code>.</p>
+<p>Concretely, for an <code>Unix.socket</code> flow, we need an <code>Unix.sockaddr</code>. For a
+<code>Tcpip_stack_direct.t</code> flow, we need an <code>Ipaddr.V4.t</code> and an <code>int</code> as a <em>port</em>.</p>
+<p>At the end, we agree that the most general (by convention) description of the
+<em>endpoint</em> is the <em>domain-name</em>. By knowing that, we decided to let the user to
+construct an <em>endpoint</em> from a concrete <code>[`host] Domain_name.t</code> (as Conduit
+decided to construct an <code>Conduit.endp</code> from an <code>Uri.t</code>).</p>
+<h3 id="how-conduit-does-that"><a class="anchor" aria-hidden="true" href="#how-conduit-does-that"></a>How Conduit does that?!</h3>
+<p>Conduit do the same job where it wants to construct an <em>endpoint</em>
+(<code>Conduit.endp</code>) from an <code>Uri.t</code>. To choose which implementation we will use,
+it looks at the <em>scheme</em> of the <code>Uri.t</code>.</p>
+<p>From our perspectives, this is not a good choice where the <em>scheme</em> is not a
+real definition of the underlying protocol used as it's explained into the
+<a href="https://tools.ietf.org/html/rfc7595#section-3.8">RFC7595</a>:</p>
+<blockquote>
+<p>A scheme name is not a &quot;protocol.&quot;</p>
+</blockquote>
+<p>However, even if <code>Conduit.endp</code> should be extensible as
+<code>Conduit.{client,server}</code> (because they are <em>intrinsic</em> each other), they still
+are delimited by an exhaustive list of constructors:</p>
+<pre><code class="language-ocaml">type endp =
+  [ `TCP of Ipaddr.t * int
+  | `Unix_domain_socket of string
+  | `Vchan_direct of int * string
+  | `Vchan_domain_socket of string * string
+  | `TLS of string * endp ]
+
+type client = [ tcp_client | vchan_client | client tls_client ] 
+</code></pre>
+<h3 id="abstract-again"><a class="anchor" aria-hidden="true" href="#abstract-again"></a>Abstract, again!</h3>
+<p>Tuyau comes with an <a href="https://github.com/dbuenzli/hmap"><em>heterogeneous</em> map</a> to be able to let the user to
+define a <code>resolve</code> function which is able to return any (structurally
+different) <em>endpoint</em>. The user must create a <em>type witness</em> which corresponds
+to a value <code>'t Tuyau.key</code> and represents type of the <em>endpoint</em>.</p>
+<p>With that, the user can <em>register</em> a <code>resolve</code> function which returns the same
+type as your <code>'t Tuyau.key</code>. In others words, we are able to provide:</p>
+<pre><code class="language-ocaml">type resolvers
+type 't key
+
+val key : name:string -&gt; 't key
+val register
+  :  key:'t key
+  -&gt; ([ `host ] Domain_name.t -&gt; 't)
+  -&gt; resolvers
+  -&gt; resolvers
+</code></pre>
+<p>By this way, the user is able to implement the resolution process and can use a
+DNS resolver or a fixed resolution table (like an <code>Hashtbl.t</code>). Tuyau needs to
+know who can create a concrete <em>endpoint</em> from a <code>[ `host ] Domain_name.t</code> to
+pass it to a protocol implementation. It's why you need to register your
+<code>resolve</code> function into our <code>resolvers</code>.</p>
+<p>Finally, Tuyau will execute all of your <em>resolvers</em> and create a list of
+heterogeneous <em>endpoints</em>. Then, from them, it is able to try to start a
+transmission to your peer.</p>
+<h4 id="give-me-the-priority"><a class="anchor" aria-hidden="true" href="#give-me-the-priority"></a>Give me the priority</h4>
+<p>Of course, <code>resolver</code> can be registered with a priority. By that, not only will
+we use your priority resolver, but we will also prioritize initialization of
+your associated protocol.</p>
+<p>The idea is to let the user to prioritize secure transmission over <em>unsecure</em>
+transmission even if both are available (like <code>https</code> and <code>http</code>).</p>
+<h2 id="tuyau-by-an-example"><a class="anchor" aria-hidden="true" href="#tuyau-by-an-example"></a>Tuyau by an example</h2>
+<p>Tuyau (and Conduit) wants to solve a difficult task which does not appear into
+usual cases. If you want to make an UNIX program, all of that is useless
+because we can directly use the UNIX environment.</p>
+<p>However, for MirageOS where nothing exists (even a DNS resolver), we need a way
+to start a transmission according to the context of the compilation. In fact,
+the TCP/IP implementation depends on the target, the configuration of your
+<em>unikernel</em>, what the user wants, etc.</p>
+<p>We will see a little example to fully understand the underlying Tuyau stack.
+What you should do as the maintainer of Git, as the developer of the protocol
+or basically as the user of Tuyau.</p>
+<h3 id="register-your-protocol-with-tuyau"><a class="anchor" aria-hidden="true" href="#register-your-protocol-with-tuyau"></a>Register your protocol with Tuyau</h3>
+<p>To play with protocols, we must <em>register</em> our protocol to Tuyau. The
+registration is global to your program. Indeed, Tuyau is able to extract your
+implementation from anywhere - internally, we save it into a global
+<code>Hashtbl.t</code>.</p>
+<p>Let's start to provide an UNIX TCP/IP protocol and register it into Tuyau!</p>
+<pre><code class="language-ocaml">module TCP = struct
+  type flow = Unix.file_descr
+  type endpoint = Unix.sockaddr
+
+  let make sockaddr =
+    let socket = Unix.socket Unix.PF_INET Unix.SOCK_STREAM in
+    Unix.connect socket sockaddr ; socket
+
+  let recv socket buf off len =
+    Unix.read socket buf off len
+
+  let send socket buf =
+    let len = String.length buf in
+    let _ = Unix.write socket (Bytes.unsafe_of_string buf) 0 len
+    in ()
+
+  let close socket = Unix.close socket
+end
+</code></pre>
+<p>We must provide these functions into our module and 2 types:</p>
+<ul>
+<li>the <code>flow</code> type</li>
+<li>the <code>endpoint</code> type</li>
+</ul>
+<p>From that, Tuyau (a specialized version according to your <em>backend</em>) provides
+a way to <em>register</em> your protocol globally. We must create our <em>type witness</em>
+about our <em>endpoint</em> and associate it with your protocol:</p>
+<pre><code class="language-ocaml">let sockaddr : Unix.sockadr Tuyau.key = Tuyau.key ~name:&quot;sockaddr&quot;
+let tcp : Unix.file_descr Tuyau.protocol =
+  Tuyau.register_protocol ~key:sockaddr (module TCP)
+</code></pre>
+<p>And it's enough! You probably should expose <code>sockaddr</code> and <code>tcp</code>. We will see
+where we can use it. But the registration is done into our internal &amp; global
+<code>Hashtbl.t</code>. Any <strong>link</strong> with this piece of code will make your protocol
+available through Tuyau.</p>
+<h3 id="register-your-resolver-with-tuyau"><a class="anchor" aria-hidden="true" href="#register-your-resolver-with-tuyau"></a>Register your resolver with Tuyau</h3>
+<p>Into another project/library/executable/unikernel, you are able to define your
+resolution process. Of course, you must link with <code>unix_tcp</code> to be able to use
+<code>Unix_tcp.sockaddr</code> and register your <em>resolver</em> with this <em>type-witness</em> - and
+it's why you should expose it into your interface.</p>
+<p>Let's use an usual resolver:</p>
+<pre><code class="language-ocaml">let resolve_http domain_name =
+  match Unix.gethostbyname (Domain_name.to_string domain_name) with
+  | { Unix.h_addr_list; _ } -&gt;
+    if Array.length h_addr_list &gt; 0
+    then Some (Unix.ADDR_INET (h_addr_list.(0), 80))
+    else None
+  | exception _ -&gt; None
+</code></pre>
+<p>This <em>resolver</em> wants to usually resolve a domain-name to an HTTP
+endpoint<sup><a href="#fn2">2</a></sup>. Of course, you can use something else like
+<a href="ocaml-dns">ocaml-dns</a> instead <code>Unix.gethostbyname</code> to be compatible with
+MirageOS.</p>
+<p>Then, we must fill <code>Tuyau.resolvers</code> with our <code>resolve_http</code>:</p>
+<pre><code class="language-ocaml">let resolvers = Tuyau.empty
+let resolvers =
+  Tuyau.register_resolver ~key:Unix_tcp.sockaddr resolve_http
+</code></pre>
+<p>You can not do a mistake between <code>Unix_tcp.sockaddr</code> and <code>resolve_http</code>.
+<em>type-witness</em> and returned value by <code>resolve_http</code> must correspond -
+otherwise, OCaml will complain with a type error which is nice!</p>
+<p><tag id="fn2"><strong>2</strong></tag>: by <em>HTTP endpoint</em>, we enforce the port <code>80</code>. Our
+UNIX TCP/IP flow is not an HTTP flow. However, an HTTP client must be connected
+to the port <code>80</code> the TCP/IP protocol.</p>
+<h3 id="come-back-to-git"><a class="anchor" aria-hidden="true" href="#come-back-to-git"></a>Come back to Git!</h3>
+<p>From the maintainer of Git's perspective, all of previous codes is outside Git.
+As we said, we don't want to depend on an implementation of TCP/IP protocol (or
+a SSH implementation). However, we should depend on Tuyau.</p>
+<p>Finally, the Tuyau core library defines only few things, the <code>resolvers</code> type
+and the <code>'a key</code> type. By this way, in our library we can write something like:</p>
+<pre><code class="language-ocaml">let clone ~resolvers domain_name repository =
+  let payload = Bytes.create 0x1000 in
+  let Tuyau_unix.Flow (flow, (module Flow)) =
+    Tuyau_unix.resolve ~resolvers domain_name in
+  Flow.send flow (Fmt.strf &quot;# git-upload-pack /%s.git&quot; repository ;
+  Flow.recv flow payload ;
+  ... 
+</code></pre>
+<p>Of course, we must choose a <em>backend</em> like LWT, ASYNC or UNIX to correctly deal
+with the scheduler about I/O operations. But for a MirageOS-compatible library,
+<code>Tuyau_lwt</code> should be enough.</p>
+<h3 id="and-run-all-of-that"><a class="anchor" aria-hidden="true" href="#and-run-all-of-that"></a>And run all of that!</h3>
+<p>Come back to our <code>main.ml</code> where we filled your <code>resolvers</code>, we properly can
+do:</p>
+<pre><code class="language-ocaml">let resolve_http domain_name =
+  match Unix.gethostbyname (Domain_name.to_string domain_name) with
+  | { Unix.h_addr_list; _ } -&gt;
+    if Array.length h_addr_list &gt; 0
+    then Some (Unix.ADDR_INET (h_addr_list.(0), 80))
+    else None
+  | exception _ -&gt; None
+
+let resolvers = Tuyau.empty
+let resolvers =
+  Tuyau.register_resolver ~key:Unix_tcp.sockaddr resolve_http
+
+let () =
+  clone ~resolvers
+    (Domain_name.(host_exn &lt;.&gt; of_string_exn) &quot;github.com&quot;)
+    &quot;decompress&quot;
+</code></pre>
+<p>Finally, we manually defined our <code>resolvers</code> by hands, we used a specific
+implementation of the TCP/IP protocol (the UNIX one) and we
+magically/dynamically plug all of that to your Git implementation through
+Tuyau.</p>
+<h3 id="go-further-with-composition"><a class="anchor" aria-hidden="true" href="#go-further-with-composition"></a>Go further with composition!</h3>
+<p>Of course, we can go further and provide a TCP + TLS implementation:</p>
+<pre><code class="language-ocaml">let sockaddr_and_tls_config, tcp_with_tls =
+  Tuyau_tls.with_tls ~key:sockaddr (module TCP)
+</code></pre>
+<p>The composition gives to us 2 values:</p>
+<ul>
+<li>the <em>type-witness</em> <code>sockaddr_and_tls_config : Unix.sockaddr * Tls.Config.client</code>.
+In fact, creation of a TCP + TLS connection is a bit more complex than TCP.
+We need a ~Tls.Config.client~ which verify certificate provided by the peer.</li>
+<li>the <em>type-witness</em> <code>tcp_with_tls : Unix.file_descr with_tls</code>.</li>
+</ul>
+<p>From that, we must provide an other resolver which give to us the
+<code>Tls.Config.client</code>:</p>
+<pre><code class="language-ocaml">let resolve_https domain_name =
+  match resolve_http domain_name with
+  | Some sockaddr -&gt;
+    let tls_config =
+      Tls.Config.client ~authenticator:X509.Authenticator.null () in
+    Some (sockaddr, tls_config)
+  | None -&gt; None
+
+let resolvers =
+  Tuyau.register_resolver ~priority:0 ~key:sockaddr_and_tls_config
+    resolve_https
+    resolvers
+</code></pre>
+<p>With the priority, we can enforce to try at the first time the TCP + TLS
+transmission instead the TCP transmission - and by this way, prefer to use the
+secure one.</p>
+<p>Again, this code still appears outside the Git implementation. We are able to
+fill Tuyau with a SSH implementation and fill the <code>resolvers</code> with a specific
+SSH configuration (like a set of private key like <code>.ssh/config</code>).</p>
+<p>In our example, we use <code>X509.Authenticator.null</code> but we can restrict the
+<code>authenticator</code> to some internals certificates. Again, the way to resolve a
+domain-name is on the responsibility of the user.</p>
+<h4 id="composition-is-not-magic"><a class="anchor" aria-hidden="true" href="#composition-is-not-magic"></a>Composition is not magic!</h4>
+<p>Composition with TLS or something else is not magic. It seems easy when we
+provide <code>with_tls</code> but we <strong>wrote</strong> the way to compose TLS with an other
+protocol - where we handled <em>handshake</em>, etc.</p>
+<p>The composition is, at the end, a <em>functor</em> which takes a <code>FLOW</code>:</p>
+<pre><code class="language-ocaml">module With_tls (Flow : FLOW) = struct
+  type endpoint = Flow.endpoint * Tls.Config.client
+  type flow = Flow.endpoint * Tls.Engine.state
+
+  ...
+end
+</code></pre>
+<p>We just hidden it with a nice function and play a bit with
+<a href="https://caml.inria.fr/pub/docs/manual-ocaml/firstclassmodules.html#s%3Afirst-class-modules">first-class modules</a>.</p>
+<h3 id="more-possibilities-on-the-user-side"><a class="anchor" aria-hidden="true" href="#more-possibilities-on-the-user-side"></a>More possibilities on the user-side</h3>
+<p>One other request about <code>Tuyau</code> is to be predictable by the kind of flow used.
+Some maintainers want to enforce a secure flow such as SSH. In this case, of
+course, the maintainer should be aware about the implementation - and link with
+it.</p>
+<p>The <code>resolve</code> function is much more complex than before on this way:</p>
+<pre><code class="language-ocaml">val resolver
+  :  resolvers
+  -&gt; ?key:'edn key
+  -&gt; ?protocol:'flow protocol
+  -&gt; [ `host ] Domain_name.t -&gt; flow
+</code></pre>
+<p>Optional arguments let the user to enforce a specific
+<em>endpoint</em><sup><a href="#fn3">3</a></sup> or a protocol (or both). When we advised to
+expose <code>val tcp : Unix.file_descr Tuyau.protocol</code> before, it's for this case.
+Imagine an SSH implementation where a ~val ssh : SSH.t Tuyau.protocol~ exists,
+the maintainer can write:</p>
+<pre><code class="language-ocaml">let clone ~resolvers domain_name repository =
+  let payload = Bytes.create 0x1000 in
+  let Tuyau_unix.Flow (flow, (module Flow)) =
+    Tuyau_unix.resolve ~resolvers ~protocol:ssh domain_name in
+  Flow.send flow (Fmt.strf &quot;# git-upload-pack /%s.git&quot; repository ;
+  Flow.recv flow payload ;
+  ... 
+</code></pre>
+<p>By this way, we ensure to use SSH when we communicate to our peer.</p>
+<p><tag id="fn3"><strong>3</strong></sup>: A <em>type-witness</em> <code>key</code> can be used and re-used with
+many protocols. We can imagine a TCP/IP protocol and a UDP/IP protocol which
+use the same sockaddr` <em>type-witness</em>.</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>As we said, Tuyau and Conduit a complex problem when we should have an easy way
+to start a <em>transmission</em> and be able to extend protocol implementations
+without a static dependency at the library level.</p>
+<p>Composition is done by the possibility to give a nice interface such as
+<code>with_tls</code> with Tuyau. But, of course, it's not magic when maintainer of
+TLS/WireGuard/Noise should provide a way to compose such layers with a given
+<code>FLOW</code>.</p>
+<p>Finally, it's hard to really understand the goal of Tuyau when, from the
+library, it's hard to reach the global view over protocols, users and finally
+the ecosystem. This article wants to give materials about that.</p>
+<h3 id="server-side"><a class="anchor" aria-hidden="true" href="#server-side"></a>Server-side</h3>
+<p>Tuyau provides something about the server-side which differs a lot from what
+Conduit does but we should explain that into an other article.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

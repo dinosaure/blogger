@@ -1,0 +1,312 @@
+/* Stolen from xvw.github.io */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+/* It is so obvious that it is surprising that it is not the default
+   behaviour! */
+
+body {
+  margin: 32px auto;
+  padding: 16px;
+  max-width: 840px;
+  background-color: #fff;
+  color: #444444;
+  font-family: monospace;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+}
+
+header {
+  margin-bottom: 32px;
+}
+
+header h1 {
+  margin: 0;
+  font-weight: 900;
+}
+
+header h1::before,
+header h1::after {
+  color: #a3a1a8;
+  font-weight: 100;
+}
+
+header h1::before {
+  content: "<h1>";
+}
+header h1::after {
+  content: "</h1>";
+}
+
+header blockquote {
+  padding: 0;
+  margin: 0;
+}
+
+hr {
+  width: 0%;
+  min-width: 20%;
+  max-width: 100%;
+  margin: 0 auto;
+  border: none;
+  border-bottom: 1px solid #666;
+  position: relative;
+  transition: box-shadow 200ms ease-in-out;
+  box-shadow: 0px 0px 0px 0px #f9f9f9;
+}
+
+main {
+  margin: 42px 0px;
+  line-height: 1.6;
+}
+
+footer {
+  padding-top: 32px;
+}
+
+.list-articles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.list-articles > li {
+  padding: 0;
+  margin: 0;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: row;
+}
+
+.list-articles > li > div.side {
+  flex: 0;
+}
+
+
+.list-articles > li > div.side img {
+  width: 32px;
+}
+
+.list-articles > li > div.content {
+  flex: 1;
+  margin-left: 12px;
+}
+
+.list-articles > li > div.content > span.date {
+  color: #a3a1a8;
+}
+.list-articles > li > div.content > p {
+  padding: 0;
+  margin: 0;
+}
+
+.list-articles > li > div.content > div.bottom {
+  padding: 4px 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+
+article h1 {
+  font-size: 1.8em;
+  margin: 20px 0;
+}
+
+article h2 {
+  font-size: 1.6em;
+  margin-top: 8px;
+}
+
+article h3 {
+  font-size: 1.4em;
+  margin-top: 4px; 
+}
+
+article h4 {
+  font-size: 1.2em;
+  margin-top: 2px;
+}
+
+article blockquote h4 {
+  margin-top: 34px;
+  margin-bottom: -16px;
+}
+
+article pre {
+  margin: 16px 8px;
+  padding: 8px;
+  font-family: 'Courier new', monospace;
+  font-size: 1.2em;
+  line-height: 100%;
+  width: 100%;
+  overflow-x: auto;
+  background-color: #000;
+}
+
+article img {
+  display: block;
+  margin: 32px auto;
+  max-width: 100%;
+}
+
+.hljs-built_in {
+  text-decoration: none;
+}
+
+.hljs-doctag,
+.hljs-formula,
+.hljs-symbol,
+.hljs-string {
+  background: none;
+  color: #666;
+}
+
+article pre code {
+  font-size: 0.8em;
+}
+
+article code {
+  font-family: 'Courier new', monospace;
+  font-size: 0.8em;
+}
+
+.tag-box {
+  margin: 0;
+  margin-bottom: 32px;
+  padding-bottom: 12px;
+  color: #111;
+}
+
+.tag-box > h3 {
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+}
+
+.tag-box > h3 > span {
+  padding: 2px 8px;
+  background-color: #111;
+  color: #fff;
+}
+
+.tag-box > h3 > span::before {
+  content: "#";
+}
+
+.valid {
+  display: inline-block;
+  margin: 20px 0;
+  border: 2px solid #444444;
+  color: #444444;
+  font-weight: 900;
+  font-size: 0.8em;
+  text-decoration: none;
+  text-transform: uppercase;
+  padding: 4px 4px 4px 1.5em;
+  position: relative;
+}
+
+.valid::before {
+  content: "";
+  position: absolute;
+  border-color: #009933;
+  border-style: solid;
+  border-width: 0 0.3em 0.25em 0;
+  height: 1em;
+  top: 1.3em;
+  left: 0.6em;
+  margin-top: -1em;
+  transform: rotate(58deg);
+  width: 0.5em;
+}
+
+.small-button {
+  display: inline-block;
+  margin: 4px 0;
+  font-weight: 900;
+  font-size: 0.7em;
+  text-decoration: none;
+  text-transform: uppercase;
+  padding: 2px 4px;
+  position: relative;
+}
+
+.rss {
+  background-color: #d94c1a;
+  color: #fff;
+}
+
+.twitter {
+  background-color: #506ad4;
+  color: #fff;
+}
+
+.github {
+  background-color: #111;
+  color: #fff;
+}
+
+.aeration {
+  margin: 32px 0 !important;
+}
+
+.tags-list {
+  padding: 0;
+  margin: 0;
+}
+
+article .tags-list {
+  margin-bottom: 32px;
+}
+
+.tags-list > li {
+  display: inline-block;
+  background-color: #f2f2f2;
+  color: #333333;
+  margin: 2px;
+  padding: 2px 8px;
+  font-size: 0.8em;
+}
+
+.tags-list > li::before {
+  content: "#";
+  color: #666;
+  margin-right: 2px;
+}
+
+.tags-list > li > a {
+  color: #333333;
+  text-decoration: none;
+}
+
+@media screen and (max-width: 720px) {
+  header h1 {
+    margin-left: 32px;
+  }
+
+  header h1::before,
+  header h1::after {
+    margin-left: -32px;
+    display: block;
+  }
+
+  header .banner {
+    display: none;
+  }
+
+  header blockquote {
+    margin-top: 16px;
+  }
+
+  main blockquote {
+    margin: 4px;
+  }
+}

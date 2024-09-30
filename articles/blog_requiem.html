@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteAgain, re-update of my blog after 2 years.
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>Again, re-update of my blog after 2 years.</h1>
+    <ul class="tags-list"><li>OCaml</li><li>MirageOS</li><li>Blog</li></ul><p>It's been 2 years since my blog has been updated. The first reason is that I
+had a lot of work to do on <a href="https://mirage.io/">MirageOS 4</a>. The second reason is a
+simple question: how to deploy several sites with one IP address? The third is
+to use ONLY OCaml.</p>
+<p>Behind these innocent questions and staking out between futile and necessary
+projects, I took the time to finally finish the deployment of my blog getting
+closer and closer to what I wanted to do in terms of deployments.</p>
+<h2 id="generate-everything-via-ocaml"><a class="anchor" aria-hidden="true" href="#generate-everything-via-ocaml"></a>Generate everything <em>via</em> OCaml</h2>
+<p>This was my first problem with my old blog. The workflow required emacs and
+produced HTML from <a href="https://www.orgmode.org/">Org</a> files. I still like the organization possible
+with Org files, but depending on a workflow that I don't control was a problem.
+I tried to find alternatives knowing that there were some researchers who had
+fun manipulating Org files in OCaml but this reality belongs to a distant
+memory that was finally irrelevant in view of the evolution of the OCaml
+ecosystem.</p>
+<p>In the end, and only recently, several people set out to make a sort of
+&quot;haskelian&quot; toolkit <em>from hell</em> in order to offer a blog engine whose
+production is described in OCaml. The name of these libraries are:</p>
+<ul>
+<li><a href="https://github.com/xvw/preface">Preface</a></li>
+<li><a href="https://github.com/xhtmlboi/yocaml">YOCaml</a></li>
+</ul>
+<p>The idea of being able to describe an engine with the help of a
+<a href="https://hackage.haskell.org/package/free">free monad</a> to which we can associate a &quot;runtime&quot; that will decide
+how to produce the blog was very appealing. Especially because the idea fits
+well with MirageOS where we want to separate the tasks.</p>
+<p>My initial idea was to generate the blog with
+<a href="https://github.com/mirage/ocaml-git">ocaml-git</a>/<a href="https://github.com/mirage/irmin">Irmin</a> in order to push the production into a
+Git repository and then add <a href="https://github.com/roburio/unipi">unipi</a> as a simple HTTP server to serve
+what is ultimately a static website.</p>
+<p>So, for the same code, I have as much the possibility to test and view my blog
+locally as to decide to push the result on a Git repository. The only
+difference is in the runtime chosen:</p>
+<pre><code class="language-ocaml">val my_blog : unit Yocaml.Effect.t
+
+let local_build target =
+  Yocaml_unix.execute my_blog
+
+let build_and_push target =
+  let module Store = Irmin_unix.Git.FS.KV (Irmin.Contents.String) in
+  let module Sync = Irmin.Sync.Make (Store) in
+  Store.remote ~ctx remote &gt;&gt;= fun remote -&gt;
+  Store.Repo.v config &gt;&gt;= fun repository -&gt;
+  Store.of_branch repository branch &gt;&gt;= fun active_branch -&gt;
+  Sync.pull active_branch upstream `Set &gt;&gt;= fun _ -&gt;
+
+  Yocaml_irmin.execute (module Yocaml_unix)
+    (module Store)
+    ~author ~author_email
+    ~branch
+    repository
+    my_blog &gt;&gt;= fun () -&gt;
+
+  Sync.push active_branch upstream
+</code></pre>
+<p>The real advantage is that <code>my_blog</code> is used by 2 different runtimes without a
+<em>functor</em>!</p>
+<p>Of course, YOCaml goes further. It offers support for <a href="https://daringfireball.net/projects/markdown/syntax">markdown</a>,
+<a href="https://yaml.org/">yaml</a> as well as <a href="https://github.com/tategakibunko/jingoo">jingoo</a> (there is also <a href="https://mustache.github.io/">mustache</a>).
+I confess that this part doesn't interest me too much and we could have some
+criticisms from the point of view of a release manager (or OCaml purist - where
+is <a href="https://github.com/ocsigen/tyxml">TyXML</a>?) but the most important is that the blog works and it's
+especially this ease of extension to YOCaml that is really interesting.</p>
+<p>I mostly took what <a href="https://xhtmlboi.github.io/">xhtmlboi</a> mainly did and made some (minor)
+changes to the design and really wanted to go further about <code>yocaml_irmin</code> - so
+I proposed <a href="https://github.com/xhtmlboi/yocaml/pull/26">some</a> <a href="https://github.com/xhtmlboi/yocaml/pull/29">patches</a>.</p>
+<h2 id="conduit-tuyau-cohttp-httpaf-and-paf"><a class="anchor" aria-hidden="true" href="#conduit-tuyau-cohttp-httpaf-and-paf"></a>Conduit, tuyau, CoHTTP, http/af and paf...</h2>
+<p>This story is less famous than the first one. Indeed, it is first of all part
+of a disagreement concerning the evolution of Conduit. As you may know, I spent
+too much time on the evolution of Conduit, keeping in mind a certain
+retro-compatibility that made me lose a lot of patience.</p>
+<p>But let's go back to the basic problem: in the context of MirageOS, we need to
+be able to inject implementations at other &quot;higher&quot; levels. For example, we
+need to be able to inject <strong>a</strong> TLS implementation into what an HTTP
+implementation uses. This is the basic example, but the same applies to a
+TCP/IP implementation.</p>
+<p>This kind of injection is normally done by <em>functor</em>. We have an implementation
+that waits for another implementation that respects a certain interface. Then,
+<code>functoria</code> helps us in the application of these <em>functors</em> according to what
+we want to produce.</p>
+<h4 id="the-usual-mirageos-design"><a class="anchor" aria-hidden="true" href="#the-usual-mirageos-design"></a>The usual MirageOS design</h4>
+<p>So we are talking about interfaces describing what implementations require.
+Beyond the problem of using <em>functors</em> too much, MirageOS has a very particular
+but pragmatic design when it comes to interfaces and implementations. An
+interface should never describe how to allocate/create the resource <code>type t</code>. A
+resource like a &quot;socket&quot; or a &quot;block device&quot; or something which represents the
+POSIX clock is, all the time, abstract. At the HTTP level (and this is already
+the case), we don't need to know structurally how a socket is defined. We just
+need actions like <code>read</code> or <code>write</code> to manipulate this abstraction - this is
+actually a fairly common design in OCaml:</p>
+<pre><code class="language-ocaml">module type SOCKET = sig
+  type t
+
+  val read : t -&gt; bytes -&gt; int -&gt; int -&gt; int
+  val write : t -&gt; string -&gt; int -&gt; int -&gt; int
+end
+</code></pre>
+<p>However, how do you get a value of <code>type t</code>? Usually, in a MirageOS project, an
+implementation implements an interface plus a <code>connect</code> function. Then,
+<code>functoria</code> allows to call this <code>connect</code> function to allocate the resource.
+The problem is that this connect function is implementation-dependent! Indeed,
+<code>lwt_ssl</code> and <code>ocaml-tls</code> should offer the same interface, <code>read</code> and <code>write</code>
+with TLS. However, one handles a <code>socket</code> and an <code>Ssl.context</code>, the other a
+<code>Mirage_flow.S</code> and a <code>Tls.Config.client</code>. Their <code>connect</code> is fundamentally
+different (in terms of what they require).</p>
+<p>That's why the <code>connect</code> is never described in the interface, an implementation
+only provides that interface plus a <code>connect</code> intrinsic to what it wishes to
+implement:</p>
+<pre><code class="language-ocaml">module Lwt_ssl = sig
+  include SOCKET
+
+  val connect : Lwt_unix.socket -&gt; Ssl.context -&gt; t
+end
+
+module OCaml_TLS = sig
+  include SOCKET
+
+  val connect : Mirage_flow.t -&gt; Tls.Config.client -&gt; t
+end
+</code></pre>
+<p>So how to allocate/initiate a TLS connection with MirageOS. Functoria will
+simply, according to the arguments, emit a sequence of <code>connect</code> (into the
+<code>main.ml</code>) with what they require and pass the allocated values to the
+<code>Unikernel.start</code> function. These will be taken and there is no way to know
+structurally how they were allocated. For resources needed by the unikernel
+from the start, this is not a problem. But in the context where we need one of
+these resources only on a specific execution path, we would not be able to
+allocate them (since we don't know how to <code>connect</code> them).</p>
+<p>This is the specific problem that Conduit wants to solve: allocate a
+resource/socket to initiate a client HTTP connection according to a particular
+condition:</p>
+<pre><code class="language-ocaml">module Make (Flow : Mirage_flow.t) =
+  val do_some_stuffs : Flow.t -&gt; unit Lwt.t
+
+  let start stdin = match input_line stdin with
+    | &quot;google.com&quot; -&gt;
+      Flow.connect &quot;8.8.8.8&quot; &gt;&gt;= fun socket -&gt; do_some_stuffs flow
+    | &quot;localhost&quot; -&gt;
+      Flow.connect &quot;127.0.0.1&quot; &gt;&gt;= fun socket -&gt; do_some_stuffs flow
+end
+</code></pre>
+<p>We can see the problem here:</p>
+<ol>
+<li><code>Flow.connect</code> is not really provided by <code>Mirage_flow.S</code>, the code can not
+compile</li>
+<li><code>Flow.connect</code> expects a <code>string</code> but what happen when we want to pass a
+specific <code>Tls.Config.client</code>, or an <code>Ipaddr.t</code> or something else?</li>
+<li>this code shows what I mean about &quot;initiate a connection according to a
+particular condition&quot; or a &quot;specific execution path&quot;. The <code>connect</code> depends
+on an <strong>user input</strong></li>
+</ol>
+<h3 id="mimic"><a class="anchor" aria-hidden="true" href="#mimic"></a>Mimic</h3>
+<p>That's why I decided to make <a href="https://github.com/dinosaure/mimic">Mimic</a>. This project is just an improved
+version of <a href="https://github.com/mirage/ocaml-conduit/pull/311">Conduit 3.0.0</a> with good documentation and an
+<a href="https://dinosaure.github.io/mimic/mimic/index.html">example</a>. It provides the <code>Mirage_flow.S</code> that we expect for
+any type of connection (TLS, SSH, TCP/IP, etc.) and especially the
+<code>Mimic.resolve</code> function that corresponds to our <code>connect</code>.</p>
+<p>The latter requires a context that you can manipulate directly. This context
+can contain values of any type. It's a <a href="https://github.com/dbuenzli/hmap">heterogeneous map</a>, quite simply.
+The key is that a ceremony that Functoria can do is needed to <em>register</em> these
+protocols (again, TLS, SSH, TCP/IP, etc.). These protocols can be initiated if,
+in the given context, there are the necessary values to allocate the said
+resource (<code>Tls.Config.client</code>, <code>Awa.private_key</code>, <code>Ipaddr.t</code>, etc.). If Mimic
+can resolve the link between these values and what the protocols expect, it
+tries to initiate these connections:</p>
+<pre><code class="language-ocaml">module Make (...) = struct
+  val do_some_stuffs : Mimic.flow -&gt; unit Lwt.t
+
+  let start stdin = match input_line stdin with
+    | &quot;google.com&quot; -&gt;
+      let ctx = Mimic.add mimic_ipaddr
+        (Ipaddr.of_string_exn &quot;8.8.8.8&quot;) Mimic.empty in
+      Mimic.resolve ~ctx &gt;&gt;= fun flow -&gt; do_some_stuffs flow
+    | &quot;localhost&quot; -&gt;
+      let ctx = Mimic.add mimic_ipaddr
+        Ipaddr.localhost Mimic.empty in
+      Mimic.resolve ~ctx &gt;&gt;= fun flow -&gt; do_some_stuffs flow
+end
+</code></pre>
+<h3 id="what-is-wrong-with-conduit"><a class="anchor" aria-hidden="true" href="#what-is-wrong-with-conduit"></a>What is wrong with Conduit?</h3>
+<p>The first problem with Conduit is that it wants to solve the issue of
+instantiating a connection for client <strong>AND</strong> server use. The second issue, as
+Hannes points out, is that we wouldn't want an abstraction for the server side.
+We would like to be fully aware of what implementation we are using to initiate
+a server. In this, Conduit is irrelevant.</p>
+<p>The second problem is the extension of protocols handled by Conduit. This
+extension is strict (if we want to extend the possibilities, we have to
+re-release Conduit) and we had a lot of trouble integrating SSH into
+<a href="https://github.com/mirage/ocaml-git"><code>ocaml-git</code></a>.</p>
+<p>Finally, the last problem is maintainability. Conduit is an old software and
+nobody really understands what's going on (not even me). As such, it is bound
+to die one way or another. Again, this criticism is factual and can be
+explained by the date of creation of Conduit where the features used by Mimic
+were not available at that time.</p>
+<p>Finally, the non-agreement to move to Conduit 3.0.0 led me to really integrate
+my solution outside of CoHTTP (the only Conduit user). And finally, I decided
+to make another CoHTTP from <a href="https://github.com/inhabitedtype/httpaf">http/af</a> that is compatible with MirageOS
+and therefore uses Mimic. The performance is good and so are the abstractions.
+This allowed me to go a little bit further and to handle version 2 of the HTTP
+protocol as well (and ALPN negotiation). Finally, this work ended up being
+integrated in <a href="https://github.com/roburio/unipi/pull/4">unipi</a> (so in this blog) which earned me 2 years of
+work! But the result is perfect - even the mirage.io website uses
+Mimic/<a href="https://github.com/dinosaure/paf-le-chien">Paf</a> as I went further and offered MirageOS support to
+<a href="https://github.com/aantron/Dream">Dream</a> through these libraries.</p>
+<h2 id="contruno-the-tls-termination-proxy"><a class="anchor" aria-hidden="true" href="#contruno-the-tls-termination-proxy"></a>Contruno, the TLS termination proxy</h2>
+<p>Finally, one question remained for me. How do you deploy multiple websites on a
+single IP address? The basic solution is to use <code>nginx</code>, let it take care of
+the TLS certificates and forward the connections to my unikernels. But I wanted
+everything to be unikernels! So I made a unikernel called <a href="https://github.com/dinosaure/contruno">contruno</a>
+which is a TLS termination proxy.</p>
+<p>It plays the same role. It manages the TLS certificates of several domain names
+and forwards the connections to a specific destination within my network:</p>
+<pre><code class="language-ocaml">                                     .- 10.0.0.1:80 [ blog.osau.re ]
+[ Internet ] -&gt; *:443 [ Contruno ] -|
+                            |        `- 10.0.0.2:80 [ paste.osau.re ]
+                            |
+                   [ Git repository ]
+</code></pre>
+<p>The problem with TLS certificates with MirageOS is long-standing. Hannes made
+the choice to use the primary DNS server to manage the Let's encrypt challenges
+and to keep the certificates in another unikernel
+<a href="https://github.com/roburio/dns-letsencrypt-secondary">dns-letsencrypt-secondary</a>. This way, a unikernel
+can request a TLS certificate from the latter and even if it goes down, the
+<code>dns-letsencrypt-secondary</code> keeps the requested certificates. This avoids
+reaching the Let's encrypt's request limit quite quickly when debugging.</p>
+<p>On my side I preferred to do the challenges with HTTP. Contruno is therefore a
+simple HTTP server that can do Let's encrypt challenges. Finally, it saves the
+certificates in a Git repository. If it goes down, it can retrieve the
+certificates again - they are not lost! Finally, it is an HTTPS server that
+will simply look at the host and redirect the connection to the correct IP
+address.</p>
+<p>In this way, when you connect to my blog, you go through 2 unikernels! They are
+still a test period but for now, they work quite well.</p>
+<h2 id="some-futile-projects"><a class="anchor" aria-hidden="true" href="#some-futile-projects"></a>Some <em>futile</em> projects</h2>
+<h3 id="conan"><a class="anchor" aria-hidden="true" href="#conan"></a>Conan</h3>
+<p>Of course, I was involved in a lot of other projects that allowed me to go
+further in the deployment. The first of these remains experimental but
+interesting. As an HTTP server, one must, sometimes, give the MIME type of the
+static files available. For a long time, this information was available through
+the extensions of the said files. However, this information can be erroneous.
+So I made <a href="https://github.com/mirage/conan">Conan</a> which is a reimplementation of <code>file</code> in OCaml. It
+will read the contents of the file and try to recognize the MIME type. You can
+get a detailed explanation <a href="https://discuss.ocaml.org/t/ann-first-release-of-conan-the-detective-to-recognize-your-file/8655">here</a>.</p>
+<h3 id="git"><a class="anchor" aria-hidden="true" href="#git"></a>Git</h3>
+<p>Git has evolved a lot too. Indeed, one of Hannes' expectations was to be able
+to compose the protocols available to initiate a connection with a Git
+repository. Of course, thanks to Mimic, this was possible and I found the
+common core of what is the Smart protocol with TCP/IP, SSH, HTTP and HTTPS.
+This means less maintenance work for me since I only have one implementation of
+the Smart protocol that works for all these protocols! The first draft was a
+duplicate of the Smart implementation with some details for SSH and HTTP.
+The second draft was a duplicate between TCP/IP or SSH and HTTP. The last one
+proposes a single implementation of Smart independently of TCP/IP, SSH or HTTP
+(or any protocol!)</p>
+<h3 id="the-mirageos-ecosystem"><a class="anchor" aria-hidden="true" href="#the-mirageos-ecosystem"></a>The MirageOS ecosystem</h3>
+<p>Finally, I've been working with Hannes on several releases to clean up our
+ecosystem and provide a better MirageOS experience! Of course, there is also
+MirageOS 4 but that will be explained in another article.</p>
+<h2 id="how-to-deploy"><a class="anchor" aria-hidden="true" href="#how-to-deploy"></a>How to deploy?!</h2>
+<p>Deploying unikernels requires a bare-metal server with KVM and a bridge on
+10.0.0.1 (a private network). We will use a Debian 10:</p>
+<pre><code class="language-sh">$ cat /etc/network/interface
+auto br0
+iface br0 inet static
+  address 10.0.0.1
+  netmask 255.255.255.0
+  broadcast 10.0.0.255
+  bridge_ports none
+  bridge_stp off
+  bridge_fd 0
+  bridge_maxwait 0
+$ ls /dev/kvm
+crw-rw---- 1 root kvm 10, 232 Apr 11 20:03 /dev/kvm
+</code></pre>
+<h3 id="albatross"><a class="anchor" aria-hidden="true" href="#albatross"></a>Albatross</h3>
+<p>To help us to deploy our unikernels, we will use <a href="https://github.com/roburio/albatross">albatross</a> which
+provides a simple daemon which create TAP interfaces and launch unikernels
+with Solo5:</p>
+<pre><code class="language-sh">$ git clone https://github.com/roburio/albatross
+$ cd albatross
+$ opam pin add -y .
+$ dune subst
+$ dune build
+$ ./packaging/debian/create_package.sh
+$ sudo dpkg -i albatross.deb
+$ sudo systemctl enable albatross_daemon.service
+</code></pre>
+<h3 id="git-repository"><a class="anchor" aria-hidden="true" href="#git-repository"></a>Git repository</h3>
+<p>We need to create 2 private Git repositories:</p>
+<ol>
+<li>A git repository which contains our website</li>
+<li>A git repository which contains TLS certificates from Let's encrypt</li>
+</ol>
+<pre><code class="language-sh">$ su git
+$ cd
+$ mkdir blog.osau.re.git
+$ cd blog.osau.re.git
+$ git init --bare
+$ git read-tree --empty
+$ FIRST_COMMIT=`git commit-tree $(git write-tree) -m .`
+$ git update-ref &quot;refs/heads/master&quot; $FIRST_COMMIT
+$ cd ..
+$ mkdir certificates.git
+$ git init --bare
+$ git read-tree --empty
+$ FIRST_COMMIT=`git commit-tree $(git write-tree) -m .`
+$ git update-ref &quot;refs/heads/master&quot; $FIRST_COMMIT
+$ cd ..
+$ exit
+</code></pre>
+<p>So we create 2 Git repositories with one commit. Now, we need to generate an
+SSH key which can be used by unikernels:</p>
+<pre><code class="language-sh">$ opam install awa
+$ awa_gen_key &gt; awa.gen.key
+$ tail -n1 awa.gen.key | ssh git@localhost 'cat &gt;&gt; ~/.ssh/authorized_keys'
+$ head -n1 awa.gen.key
+seed is svIdyO8boxNQP03NrUgfwDxk4iPaURukAyKl1cx8
+</code></pre>
+<p>You must keep the seed of the RSA key. We will use it for unikernels then.</p>
+<h3 id="blogger"><a class="anchor" aria-hidden="true" href="#blogger"></a><code>blogger</code></h3>
+<p>Finally, we can re-generate this blog with https://github.com/dinosaure/blogger
+and push the result into our private Git repository:</p>
+<pre><code class="language-sh">$ git clone https://github.com/dinosaure/blogger
+$ cd blogger
+$ opam pin add -y .
+$ dune exec src/blogger.exe -- push \
+  --author &quot;Romain Calascibetta&quot; \
+  --email &quot;romain.calascibetta@gmail.com&quot; \
+  --branch &quot;gh-pages&quot; \
+  -r git@localhost:blog.osau.re.git
+</code></pre>
+<p>Feel free to update/change <code>blogger</code> to be able to generate something closer
+to what you want. The structure is pretty good to play and run:</p>
+<ul>
+<li><code>dune exec src/blogger.exe -- watch</code> builds and runs a local website. By this
+way you can check the result</li>
+<li><code>dune exec src/blogger.exe -- build</code> just builds the website into the default
+<code>_site</code> directory. Then, you are able to do what you want on it</li>
+</ul>
+<h3 id="contruno-and-lets-encrypt"><a class="anchor" aria-hidden="true" href="#contruno-and-lets-encrypt"></a>Contruno and Let's encrypt</h3>
+<p>Let's prepare and deploy our first unikernel (with MirageOS 4). Contruno
+provides a simple tool to populate the Git repository and the unikernel. We
+will populate our <code>certificates.git</code> with a first Let's encrypt certificate
+asked by hands - <code>contruno</code> will handle next challenge to renew certificates -
+and push it into our Git repository <em>via</em> our <code>contruno.add</code> tool.</p>
+<pre><code class="language-sh">$ git clone https://github.com/dinosaure/contruno
+$ cd contruno
+$ opam pin add -y .
+$ sudo certbot certonly --standalone \
+  --server https://acme-staging-v02.api.letsencrypt.org/directory \
+  --register-unsafely-without-email \
+  -d &lt;DOMAIN&gt;
+$ sudo cp /etc/letsencrypt/live/&lt;DOMAIN&gt;/* .
+$ contruno.add --cert cert.pem -h &lt;DOMAIN&gt; -i &lt;IP1&gt; -p privkey.pem \
+  --pass &lt;PASSWORD&gt; -r git@localhost:certificates.git \
+  -t &lt;IP0&gt;
+</code></pre>
+<ul>
+<li><code>&lt;IP1&gt;</code> is where you want to deploy your website, let's say 10.0.0.3</li>
+<li><code>&lt;IP0&gt;</code> is where you want to deploy <code>contruno</code>, let's say 10.0.0.2</li>
+<li><code>&lt;PASSWORD&gt;</code> is a password to ask the deployed <code>contruno</code> unikernel to
+update its internal certificates</li>
+<li><code>&lt;DOMAIN&gt;</code> is your domain name</li>
+</ul>
+<p><strong>NOTE</strong>: <code>certbot</code> currently asks a non-production certificate. If you want a
+<em>real</em> TLS certificate, you should delete the <code>--server</code> argument.</p>
+<p>And let's compile and deploy <code>contruno</code>:</p>
+<pre><code class="language-sh">$ cp -r contruno/unikernel contruno-unikernel/
+$ cd contruno-unikernel/
+$ mirage configure -t hvt
+$ make depends
+$ mirage build
+$ albatross-client-local create --mem=512 --net=service:br0 contruno \
+  dist/contruno.hvt \
+  --arg=&quot;-r git@10.0.0.1:certificates.git&quot; \
+  --arg=&quot;--production true&quot; \
+  --arg=&quot;--ssh-key=rsa:svIdyO8boxNQP03NrUgfwDxk4iPaURukAyKl1cx8&quot; \
+  --arg=&quot;--pass=&lt;PASSWORD&gt;&quot; \
+  --arg=&quot;--ipv4=10.0.0.2/24&quot; \
+  --arg=&quot;--ipv4-gateway=10.0.0.1&quot;
+</code></pre>
+<h3 id="unipi"><a class="anchor" aria-hidden="true" href="#unipi"></a>Unipi</h3>
+<p>And the last one, we will deploy our <a href="https://github.com/roburio/unipi">unipi</a> unikernel:</p>
+<pre><code class="language-sh">$ git clone https://github.com/dinosaure/unipi#mirage-4
+$ cd unipi
+$ mirage configure -t hvt
+$ make depends
+$ mirage build
+$ albatross-client-local create --mem=512 --net=service:br0 &lt;DOMAIN&gt; \
+  dist/unipi.hvt \
+  --arg=&quot;--remote git@10.0.0.1:blog.osau.re.git#gh-pages&quot; \
+  --arg=&quot;--ssh-key=rsa:svIdyO8boxNQP03NrUgfwDxk4iPaURukAyKl1cx8&quot; \
+  --arg=&quot;--hostname &lt;DOMAIN&gt;&quot; \
+  --arg=&quot;--tls=false&quot; \
+  --arg=&quot;--ipv4=10.0.0.3/24&quot; \
+  --arg=&quot;--ipv4-gateway=10.0.0.1&quot;
+</code></pre>
+<h3 id="iptables"><a class="anchor" aria-hidden="true" href="#iptables"></a><code>iptables</code></h3>
+<p>The last configuration is about the <code>iptables</code>. This is the hard one to let
+unikernels to communicate with Internet - specially <code>contruno</code>, <code>unipi</code> can
+stay into our private network. We will follow what <code>docker</code> does when you want
+to bridge our containers with Internet:</p>
+<pre><code class="language-sh">$ sudo iptables -A FORWARD -o br0 -m conntrack --ctstate RELATED,ESTABLISHED \
+  -j ACCEPT
+$ sudo iptables -A FORWARD -i br0 ! -o br0 -j ACCEPT
+$ sudo iptables -A FORWARD -i br0 -o br0 -j ACCEPT
+$ sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 ! -o br0 -j MASQUERADE
+
+$ sudo iptables -N CONTRUNO
+$ sudo iptables -A CONTRUNO -d 10.0.0.3/32 ! -i br0 -o br0 \
+  -p tcp -m tcp --dport 443 -j ACCEPT
+$ sudo iptables -A CONTRUNO -d 10.0.0.3/32 ! -i br0 -o br0 \
+  -p tcp -m tcp --dport 80 -j ACCEPT
+$ sudo iptables -A FORWARD -o br0 -j CONTRUNO
+$ sudo iptables -t nat -N CONTRUNO
+$ sudo iptables -t nat -A PREROUTING -m addrtype --dst-type LOCAL -j CONTRUNO
+$ sudo iptables -t nat -A CONTRUNO ! -s 10.0.0.3/32 ! -i docker0 \
+  -p tcp -m tcp --dport 443 -j DNAT --to-destination 10.0.0.3:443
+$ sudo iptables -t nat -A CONTRUNO ! -s 10.0.0.3/32 ! -i docker0 \
+  -p tcp -m tcp --dport 80 -j DNAT --to-destination 10.0.0.3:80
+</code></pre>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>I hope this article gives a little more clarity about my blog, MirageOS and
+OCaml and all the efforts everyone has made to come up with solutions that use
+OCaml to generate a static blog. There are other solutions like
+<a href="https://github.com/patricoferris/sesame">sesame</a> or <a href="https://github.com/Armael/stone">stone</a>. None of them would be ultimate and only the
+diversity of solutions is king - which is not bad. I hope I can keep this blog
+going for a long time and that it will help newcomers to OCaml and MirageOS to
+understand the ecosystem a bit more.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

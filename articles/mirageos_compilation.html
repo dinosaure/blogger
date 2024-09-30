@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteMirageOS compilation
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>MirageOS compilation</h1>
+    <ul class="tags-list"><li>OCaml</li><li>MirageOS</li></ul><p>MirageOS is not only one software but many libraries and tools which want to
+provide a good <em>user-experience</em> about developing a full operating system. By
+this way, they want to solve many problems with patterns and designs used by
+the core team. However, as I said in my previous article, documentation or
+materials don't really exist about these details.</p>
+<p>So let's start with one about the compilation of an <em>unikernel</em>.</p>
+<h2 id="abstraction-interface-and-functor"><a class="anchor" aria-hidden="true" href="#abstraction-interface-and-functor"></a>Abstraction, interface and <em>functor</em></h2>
+<p>The biggest goal of MirageOS is to provide a set of <em>interfaces</em>. Go back to
+the OCaml world, we separate two things, the implementation (<code>.ml</code>) and the
+interface (<code>.mli</code>). An implementation can declare lot of things where an
+interface wants to restrict access to some underlying
+functions/constants/variables.</p>
+<p>The interface can <em>abstract</em> definition of type where, inside (into the
+implementation), the underlying structure is well-known and outside, the
+ability to construct the value must be done by described functions into the
+<code>.mli</code>.</p>
+<h3 id="a-simple-module-with-its-interface"><a class="anchor" aria-hidden="true" href="#a-simple-module-with-its-interface"></a>A simple module with its interface</h3>
+<pre><code class="language-ocaml">type t = string
+
+let v x = String.lowercase_ascii x
+let compare = String.compare
+</code></pre>
+<pre><code class="language-ocaml">type t
+
+val v : string -&gt; t
+val compare : t -&gt; t -&gt; int
+</code></pre>
+<p>In your example, our <code>type t</code> is a <code>string</code>. However. to make a <code>t</code>, we must
+use <code>v</code> which applies <code>String.lowercase_ascii</code>. Then, we provide the <code>compare</code>
+function to be able to make a <code>Set</code> or a <code>Map</code> of <code>t</code>. On that, we can express
+a simple idea:</p>
+<blockquote>
+<p>a <em>field-name</em> is a <code>string</code> where the comparison of them is
+case-insensitive, such as <code>Received</code> and <code>received</code> are equivalent.</p>
+</blockquote>
+<p>Then, for any who wants to use this module, he/she must use <code>v</code> to <em>create</em> a
+field-name and be able to use it with <code>compare</code>. Generally, we provide a <code>pp</code>
+(Pretty-Printer) to debug, and the couple <code>to_string</code>/<code>of_string</code>.</p>
+<p>But the point is to able, by the interface, to restrict the user about what
+he/she can do and define about what he/she can rely when he/she uses such
+value.</p>
+<h3 id="trust-only-on-the-given-interface"><a class="anchor" aria-hidden="true" href="#trust-only-on-the-given-interface"></a>Trust only on the given interface</h3>
+<p>MirageOS did the choice to trust only on the interface. For us, a <em>device</em>, a
+protocol or a server can be well defined by an interface. This is the purpose
+of <code>mirage-types</code> which provides such things.</p>
+<p>The key now is: because for each <em>artifact</em> we have, we use them with their
+interfaces, how to compose them into on a specific computation?</p>
+<p>This is the purpose of MirageOS: a tool to compose implementations (<code>.ml</code>)
+according expected interfaces (<code>.mli</code>) and produce then a operating system (the
+specific computation).</p>
+<h2 id="a-mirageos-project"><a class="anchor" aria-hidden="true" href="#a-mirageos-project"></a>A MirageOS project</h2>
+<p>Indeed, the global idea of an <em>unikernel</em> is: develop the main computation of
+your operating system and be able to abstract it over protocols, devices and,
+at the end, <em>targets</em>.</p>
+<p>Let's start to talk about the TCP/IP stack. Usually, on UNIX, we create a
+<code>socket</code> and we use it to receive and send data. Then, the role of your
+operating system is to handle it with your ethernet/wlan card.</p>
+<p>We can abstract the idea of the <code>socket</code> by this interface:</p>
+<pre><code class="language-ocaml">type t
+type error
+
+val recv : t -&gt; bytes -&gt; ([ `Eoi | `Data of int ], error) result
+val send : t -&gt; string -&gt; (int, error) result
+</code></pre>
+<p>Then, we can trust over this interface to represent the way to send and receive
+data over TCP/IP. Of course, at this stage, we don't know details about
+implementation - and this is what we want.</p>
+<pre><code class="language-ocaml">module Make (Flow : FLOW) = struct
+  let start flow =
+    Flow.send flow &quot;Hello World!&quot;
+end
+</code></pre>
+<p>The abstraction is done. Now, we have our main computation which can be use
+with something implements our <code>socket</code>.</p>
+<p>And it comes with another tool, <code>Functoria</code> to orchestrate, depending on the
+target, which implementation will be use to apply the final <em>functor</em>. For
+UNIX, we will apply the <em>functor</em> with <code>mirage-tcpip.stack-socket</code> and for
+Solo5/Xen, we apply with <code>mirage-tcpip.stack-direct</code>.</p>
+<h2 id="functor-everywhere"><a class="anchor" aria-hidden="true" href="#functor-everywhere"></a><em>functor</em> everywhere</h2>
+<p><em>Functorize</em> the code seems to be a good idea where:</p>
+<ul>
+<li>the cost at the <em>runtime</em> is minimal</li>
+<li>abstraction is powerful (we can define new types, constraints, etc.)</li>
+</ul>
+<h2 id="an-example"><a class="anchor" aria-hidden="true" href="#an-example"></a>An example</h2>
+<p>We can show what is really going on about MirageOS about a little example on
+the abstraction of the <code>Console</code> to be able to write something. Imagine this
+<em>unikernel</em>:</p>
+<pre><code class="language-ocaml">module type CONSOLE = sig
+  type t
+
+  val endline : t -&gt; string -&gt; unit
+end
+
+module Make (Console : CONSOLE) = struct
+  let start console =
+    Console.endline console &quot;Hello World!&quot;
+end
+</code></pre>
+<p>This <em>unikernel</em> expects an implementation of the <em>Console</em>. The idea behind
+the <em>Console</em> is to be able to write something on it. In MirageOS, the
+interface should provide something to represent the console (the <code>type t</code>) and
+what you can do with it (the function <code>val endline</code>).</p>
+<p>Then, usually, <code>Functoria</code> will generate a <code>main.ml</code> according the chosen
+target and apply our <em>functor</em> with the right implementation. But let's talk
+about implementations.</p>
+<h3 id="implementations"><a class="anchor" aria-hidden="true" href="#implementations"></a>Implementations</h3>
+<p>We probably should have 2 implementations:</p>
+<ul>
+<li>an UNIX implementation which will use the <em>syscall</em> <code>write</code></li>
+<li>a <em>standalone</em> implementation which should work on any targets (like Solo5) -
+and it should depend only on the <em>caml</em> runtime</li>
+</ul>
+<pre><code class="language-ocaml">type t = Unix.file_descr
+
+let endline fd str =
+  let _ = Unix.write_substring fd str 0 (String.length str) in
+  let _ = Unix.write_substring fd &quot;\n&quot; 0 1 in
+  ()
+;;
+</code></pre>
+<pre><code>type t = out_channel
+
+let endline oc str =
+  output_string oc str ;
+  output_string oc &quot;\n&quot;
+;;
+</code></pre>
+<h3 id="orchestration"><a class="anchor" aria-hidden="true" href="#orchestration"></a>Orchestration</h3>
+<p>As I said, then, <code>Functoria</code> will take the place and will generate a <code>main.ml</code>
+which will:</p>
+<ul>
+<li>apply <code>Unikernel.Make</code></li>
+<li>call the <code>start</code> function with the representation of the <em>Console</em></li>
+</ul>
+<p>Concretely, this file appears when you do <code>mirage configure</code> where you can
+specify the target. So, imagine we want to use the UNIX target (the default
+one), <code>Functoria</code> will generate:</p>
+<pre><code>include Unikernel.Make(Console_unix)
+
+let () = start Unix.stdout
+</code></pre>
+<h3 id="compilation"><a class="anchor" aria-hidden="true" href="#compilation"></a>Compilation</h3>
+<p>The compilation can be separated into 2 steps where we compile object files
+first and we do the link according the target:</p>
+<pre><code class="language-sh">$ ocamlopt -c unikernel.ml
+$ ocamlopt -c console_unix.ml
+$ ocamlopt -c main.ml
+</code></pre>
+<pre><code class="language-sh">$ ocamlopt -o main -c unix.cmxa \
+  console_unix.cmx unikernel.cmx main.cmx
+</code></pre>
+<p>We can see that the most specific command according the target is the link step
+where <code>unix.cmxa</code> appears. Of course, for another target like Solo5, we will
+use <code>console_caml.ml</code>. The link step will be a bit complex where we will
+produce a <code>main.o</code> (with <code>-output-obj</code> option). Then, the <code>mirage</code> tool will
+properly call <code>ld</code> with a specific link script according the target.</p>
+<h3 id="results"><a class="anchor" aria-hidden="true" href="#results"></a>Results</h3>
+<p>Of course, all of this process is done by the <code>mirage</code> tool but it's
+interesting to understand what is going on when we do the usual:</p>
+<ul>
+<li><code>mirage configure</code></li>
+<li><code>mirage build</code></li>
+</ul>
+<h3 id="implementation-according-the-target"><a class="anchor" aria-hidden="true" href="#implementation-according-the-target"></a>Implementation according the target</h3>
+<p>For some others targets - much more specials targets - implementation can
+directly use the <em>syscall</em> available on the target (like <code>solo5_console_write</code>)
+with <code>external</code>.</p>
+<pre><code class="language-ocaml">external solo5_console_write : string -&gt; unit = &quot;solo5_console_write&quot;
+
+type t = unit
+
+let endline () str =
+  solo5_console_write str ;
+  solo5_console_write &quot;\n&quot;
+;;
+</code></pre>
+<p>As you can see, we still continue to follow the interface <code>CONSOLE</code> even if the
+representation of <code>t</code> is <code>unit</code> (so, nothing).</p>
+<h2 id="the-power-of-the-abstraction"><a class="anchor" aria-hidden="true" href="#the-power-of-the-abstraction"></a>The power of the abstraction</h2>
+<p>The goal of all of that is to be able to switch easily from an implementation
+to another one - like, switch from <code>socket</code> given by the Unix module to our own
+implementation of the TCP/IP stack.</p>
+<p>Finally, the end user can completely discard details about underlying
+implementations used for his purpose and he/she can focus only on what he/she
+wants - of course, he/she must trust on what he/she uses. But if he/she does
+correctly the job, then others users can go further by composition and <em>hijack</em>
+underlying implementations by something else without any update of the main
+computation.</p>
+<p>An example of that is to make a website and plug without any headache a TLS
+support. It should only be a composition between the TCP/IP flow with TLS to
+emit the same abstraction as before:</p>
+<pre><code class="language-ocaml">val with_tls
+  :  (module Flow with type t = 'flow)
+  -&gt; (module Flow with type t = 'flow * Tls.t)
+</code></pre>
+<p>Globally, each piece of your <em>unikernel</em> can be replaced by something else
+(more fast, more secure, etc.). MirageOS is not a monolithic software at end,
+it's a real framework to build your operating system.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>

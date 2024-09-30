@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's websiteoptint, 32-bits, 64-bits architecture and optimization
+    </title>
+    <meta name="description" content="">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>optint, 32-bits, 64-bits architecture and optimization</h1>
+    <ul class="tags-list"><li>OCaml</li><li>Optimization</li></ul><p>When I tried to implement <a href="https://zlib.net/">zlib</a> in OCaml, I ran into a thorny issue
+regarding the <em>checksum</em> of the document requiring a 32-bit integer. Indeed, we
+need to explain OCaml a bit to understand where the problem lies. This article
+is a good opportunity to explain <code>optint</code>, a small library that wants to solve
+an optimization problem between 32-bit and 64-bit architectures.</p>
+<h2 id="an-ocaml-integer"><a class="anchor" aria-hidden="true" href="#an-ocaml-integer"></a>An OCaml integer</h2>
+<p>OCaml provides an <em>immediate</em> integer <code>int</code> which has the particularity of not
+being <em>boxed</em> (hence the immediate). Indeed, OCaml has a unified representation
+of values. Some kind of values are represented through a pointer but it's not
+the case of <code>int</code> and <code>bool</code> which directly use a simple word (a 32-bits word
+or a 64-bits word depending on the architecture).</p>
+<p>However, to differentiate a pointer from an <em>immediate</em> value (such as an
+<code>int</code>), a <em>tag</em> bit is used. That mostly means that an <code>int</code> in OCaml is
+encoded into 31-bits or 63-bits and we must let the least significant bit for
+the runtime to be able to differentiate this immediate value from a pointer.</p>
+<p>From this simple description, in the problem stated in the introduction, how do
+we handle a 32-bit checksum for all platforms? We could use an <code>int32' which, unlike an </code>int', is <em>boxed</em>. The advantage is that the code manipulating this
+checksum is portable regardless of the architecture. The disadvantage of course
+is the indirection inherent in this boxed value.</p>
+<p>We could use the immediate type <code>int</code> but in that case, our code would not work
+for a 32-bit architecture since our checksum could only be encoded on 31-bits
+(and a checksum really needs 32-bits).</p>
+<h2 id="a-conditional-compilation"><a class="anchor" aria-hidden="true" href="#a-conditional-compilation"></a>A conditional compilation</h2>
+<p>Perhaps the solution would be to propose a module with a <code>type t</code> whose true
+representation depends on the target architecture and which proposes, at least,
+32-bits in any case.</p>
+<p>In this case, for a 64-bit architecture, we would use an immediate type and for
+a 32-bit architecture, we would use the boxed type <code>int32</code>.</p>
+<p>This is what <a href="https://github.com/mirage/optint"><code>optint</code></a> tries to provide.</p>
+<p><strong>NOTE</strong>: <a href="https://github.com/CraigFe">@CraigFe</a> went further and proposed the <code>int63</code> type. The
+logic remains more or less the same, for a 32-bit architecture one would use
+the boxed type <code>int64</code> and for 64-bit architectures one would use the immediate
+type <code>int</code> (containing 63-bits).</p>
+<p>The first draft of the conditional compilation was made <em>via</em> a <code>select.ml</code>
+script which informs <code>jbuild</code> (yeah, <code>jbuild</code>...) to select the right
+implementation for a given interface.</p>
+<pre><code class="language-ocaml">let invalid_arg fmt = Format.ksprintf (fun s -&gt; invalid_arg s) fmt
+
+let () =
+  let is_x64, output =
+    try match Sys.argv with
+        | [| _; &quot;--x64&quot;; is_x64; &quot;-o&quot;; output; |] -&gt;
+           let is_x64 = match is_x64 with
+             | &quot;true&quot; | &quot;!true&quot; -&gt; true
+             | &quot;false&quot; | &quot;!false&quot; -&gt; false
+             | v -&gt; invalid_arg &quot;Invalid argument of x64 option: %s&quot; v in
+           is_x64, output
+        | _ -&gt; invalid_arg &quot;%s --x64 (true|false) -o &lt;output&gt;&quot; Sys.argv.(0)
+    with _ -&gt; invalid_arg &quot;%s --x64 (true|false) -o &lt;output&gt;&quot; Sys.argv.(0) in
+  let oc = open_out output in
+  let backend =
+    if is_x64 then &quot;Int_x64_backend&quot; else &quot;Int_x86_backend&quot; in
+  Printf.fprintf oc &quot;include %s\n%!&quot; backend;
+  close_out oc
+</code></pre>
+<pre><code class="language-scheme">(jbuild_version 1)
+
+(rule
+ ((targets (optint.ml))
+  (deps    (select/select.ml))
+  (action  (run ${OCAML} ${&lt;}
+             --x64 ${ARCH_SIXTYFOUR} -o ${@}))))
+
+(library
+ ((name        optint)
+  (public_name optint)))
+</code></pre>
+<p>In this example, we keep the same interface regardless implementations. By this
+(bad) design, we must abstract <code>Optint.t</code>. Of course, we can generate an
+<code>optint.mli</code> depending on the architecture - but we did not take this choice
+at this time. This version of <code>optint</code> (with the <code>Optint.t</code> abstracted) shows
+us another point, another disadvantage: the cross-module optimisation
+with OCaml.</p>
+<p>Because the type is abstract, a library using <code>optint</code> cannot really know
+structurally whether the type is immediate or not. It is therefore unable to
+optimise its use and will box the value <em>à priori</em>.</p>
+<p>It was not obvious at the outset that the problem with the use of <code>optint</code> only
+concerned <a href="https://github.com/mirage/checkseum">checkseum</a>. The aim was to produce a C function
+<code>digest_crc32</code> according to the architecture. One taking a boxed value and the
+other taking an immediate value. We then had, all the same, a cheaper FFI
+depending on the architecture.</p>
+<h2 id="optimization--propagation"><a class="anchor" aria-hidden="true" href="#optimization--propagation"></a>Optimization &amp; propagation</h2>
+<p>Now the question is: how do we propagate the information that <code>Optint.t</code> is
+immediate in the case of a 64-bit architecture and thus let the compiler
+properly optimize our use of <code>Optint.t</code>?</p>
+<p>Something interesting was in OCaml about this:
+<a href="https://github.com/ocaml/ocaml/pull/8806">Add support for [@@immediate64]</a></p>
+<p>The trick is in this code where you can see the use of an <code>Obj.magic</code>:</p>
+<pre><code class="language-ocaml">module type Immediate = sig
+  type t [@@immediate]
+end
+
+module type Non_immediate = sig
+  type t
+end
+
+type t [@@immediate64]
+
+type 'a repr =
+  | Immediate : Immediate.t repr
+  | Non_immediate : Non_immediate.t repr
+
+external magic : _ repr -&gt; t repr = &quot;%identity&quot;
+
+let repr =
+  if word_size = 64 then
+    magic Immediate
+  else
+    magic Non_immediate
+</code></pre>
+<p>Such trick is possible because, on the runtime, <code>Immediate</code> and <code>Non_immediate</code>
+have the same representation (but not the same value), an <em>immediate</em> value!
+Even if we use an <code>Obj.magic</code>, it's a &quot;safe&quot; usage according to what we know
+about how OCaml can represent these values.</p>
+<p>But the most important part is the GADT. Indeed, <code>type 'a repr</code> comes with a
+<strong>type information</strong> that can inform us (from the point of view of the type
+system) if the type is immediate or not!</p>
+<p>Most importantly, it means that we can introspect <code>Optint.t</code> and thus propagate
+the information to produce better performing code!</p>
+<pre><code class="language-ocaml">module Conditional = struct
+  type ('t, 'u, 'v) t =
+    | True : ('t, 't, _) t
+    | False : ('t, _, 't) t
+end
+
+let is_immediate : (Optint.t, int, int32) Conditional.t = match repr with
+  | Immediate -&gt; Conditional.True
+  | Non_immediate -&gt; Conditional.False
+</code></pre>
+<p>This code is completely safe! Even though we know that <code>'a repr</code> comes from an
+<code>Obj.magic</code>, this code is correct for all architectures and therefore allows us
+to structurally introspect what <code>Optint.t</code> is. We can start propagating this
+information.</p>
+<h3 id="checkseum-and-propagation"><a class="anchor" aria-hidden="true" href="#checkseum-and-propagation"></a><code>checkseum</code> and propagation</h3>
+<p>Back to the original problem, the aim is to have an FFI with a C code that is
+as inexpensive as possible. Even if we use an abstract type, OCaml passes the
+value back as it should be represented.</p>
+<pre><code class="language-ocaml">external digest_crc32
+  : Optint.t -&gt; string -&gt; int -&gt; int -&gt; Optint.t
+  = &quot;checkseum_digest_crc32&quot;
+</code></pre>
+<p>So, for the C side, we have to do, again, a conditioned compilation that
+expects either an immediate value or a boxed value.</p>
+<pre><code class="language-c">#ifdef ARCH_SIXTYFOUR
+CAMLprim value
+checkseum_digest_crc32(value t, value src, value off, value len)
+{
+  intnat res = digest_crc32(Int_val (t), String_val (src) + Long_val (off),
+                            Long_val (len)) ;
+  return (Val_int (res)) ;
+}
+#else
+checkseum_digest_crc32(value t, value src, value off, value len)
+{
+  uint32_t res = digest_crc32(Int32_val (t), String_val (src) + Long_val (off),
+                            Long_val (len)) ;
+  return (caml_copy_int32 (res)) ;
+}
+#endif
+</code></pre>
+<p>Again, one can see another disadvantage, since we were not able to introspect
+<code>Optint.t</code>, we could not tag our externals with <code>[@noalloc]</code> - and for sure,
+for a 32-bit architecture, there is an allocation (with <code>caml_copy_int32</code>).</p>
+<p>However, we now have propagation available using our <code>Conditional.t</code>. The trick
+is to offer 2 implementations in OCaml (one for 64-bits and one for 32-bits)
+and to create a module that will result from introspection of 'a Optint.repr'.
+On the C side, we can keep the multiple implementations (<em>tagged</em>, <em>boxed</em>,
+<em>untagged</em> and <em>unboxed</em>):</p>
+<pre><code class="language-c">CAMLprim value
+checkseum_digest_crc32_tagged(value t, value src, value off, value len)
+{
+  intnat res = digest_crc32(Int_val (t), String_val (src) + Long_val (off),
+                            Long_val (len));
+  return (Val_int (res));
+}
+
+intnat
+checkseum_digest_crc32_untagged(intnat t, value src, intnat off, intnat len)
+{
+  intnat res = digest_crc32(t, String_val (src) + off, len);
+  return res;
+}
+
+CAMLprim value
+checkseum_digest_crc32_boxed(value t, value src, value off, value len)
+{
+  uint32_t res = digest_crc32(Int32_val (t), String_val (src) + Long_val (off),
+                             Long_val (len));
+  return (caml_copy_int32 (res));
+}
+
+uint32_t
+checkseum_digest_crc32_unboxed(uint32_t t, value src, intnat off, intnat len)
+{
+  uint32_t res = digest_crc32(t, String_val (src) + off, len);
+  return res;
+}
+</code></pre>
+<pre><code class="language-ocaml">module Optint : sig
+  type t [@@immediate64]
+
+  val is_immediate : (t, int, int32) Conditional.t
+end
+
+module CRC32_64 = struct
+  type t = int
+
+  external digest
+    : (t[@untagged]) -&gt; string -&gt;
+      (int[@untagged]) -&gt; (int[@untagged]) -&gt; (t[@untagged)
+    = &quot;checkseum_digest_crc32_tagged&quot; &quot;checkseum_digest_crc32_untagged&quot;
+    [@@noalloc]
+end
+
+module CRC32_32 = struct
+  type t = int32
+
+  external digest
+    : (t[@unboxed]) -&gt; string -&gt;
+      (int[@untagged]) -&gt; (int[@untagged]) -&gt; (t[@unboxed])
+    = &quot;checkseum_digest_crc32_boxed&quot; &quot;checkseum_digest_crc32_unboxed&quot;
+    [@@noalloc]
+end
+
+module CRC32 = struct
+  let impl : (module type S with type t = Optint.t) =
+    match Optint.is_immediate with
+    | True -&gt; (module CRC32_64 : S with type t = Optint.t)
+    | False -&gt; (module CRC32_32 : S with type t = Optint.t)
+
+  include (val impl : S with type t = Optint.t)
+end
+</code></pre>
+<p>Finally, all the information that can help the compiler generate the cheapest
+FFI with C is there:</p>
+<ul>
+<li><code>[@untagged]</code> to directly use an <code>intnat</code> rather than <code>Int_val</code>/<code>Val_int</code></li>
+<li><code>[@unboxed]</code> to directly debox an <code>int32</code> and not use
+<code>Int32_val</code>/<code>Val_int32</code>/<code>caml_copy_int32</code></li>
+<li><code>[@@noalloc]</code> (which only applies to the C function for native compilation)
+which avoids generating the ceremony for the GC to pass into the C world</li>
+</ul>
+<p>So we have a library that can take part of the possible optimizations in
+64-bits (and use immediate values instead of boxed ones) while keeping the
+support consistent with 32-bits architecture!</p>
+<p>Note that the choice of implementation in OCaml is no longer made using a
+<em>meta</em> tool such as <code>dune</code> but directly in OCaml using a GADT to ensure and
+reassure the type system!</p>
+<h3 id="special-thanks"><a class="anchor" aria-hidden="true" href="#special-thanks"></a>Special thanks</h3>
+<p>I would especially like to thank <a href="https://github.com/CraigFe">@CraigFe</a> for taking the time to
+revive this old library by adding the support of <code>int63</code> <em>via</em> this trick.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>
