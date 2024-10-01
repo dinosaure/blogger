@@ -2,7 +2,7 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>The dinosaure&apos;s blog</title>
-    <link>https://blog.osau.re/</link>
+    <link>https://blog.osau.re</link>
     <description><![CDATA[My personnal blog about MirageOS & OCaml]]></description>
     <atom:link href="https://blog.osau.re/feed.xml" rel="self" type="application/rss+xml"/>
     <lastBuildDate>Fri, 27 Sep 2024 00:00:00 GMT</lastBuildDate>
@@ -10,156 +10,162 @@
     <generator>YOCaml</generator>
     <item>
       <title>Happy eyeballs?!</title>
-      <link>https://blog.osau.re//articles/happy_eyeballs.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/happy_eyeballs.html</guid>
+      <link>https://blog.osau.re/articles/happy_eyeballs.html</link>
+      <description><![CDATA[When connect() hides a lot of details.]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/happy_eyeballs.html</guid>
       <pubDate>Fri, 27 Sep 2024 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Cooperation and Lwt.pause</title>
-      <link>https://blog.osau.re//articles/lwt_pause.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/lwt_pause.html</guid>
+      <link>https://blog.osau.re/articles/lwt_pause.html</link>
+      <description><![CDATA[A disgression about Lwt and Miou]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/lwt_pause.html</guid>
       <pubDate>Sun, 11 Feb 2024 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Rules of Miou!</title>
-      <link>https://blog.osau.re//articles/miou_rules.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/miou_rules.html</guid>
+      <link>https://blog.osau.re/articles/miou_rules.html</link>
+      <description><![CDATA[A description of the Miou design and its rules]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/miou_rules.html</guid>
       <pubDate>Mon, 09 Oct 2023 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Miou, a simple scheduler for OCaml 5</title>
-      <link>https://blog.osau.re//articles/miou.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/miou.html</guid>
+      <link>https://blog.osau.re/articles/miou.html</link>
+      <description><![CDATA[A description of the Miou scheduler]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/miou.html</guid>
       <pubDate>Fri, 08 Sep 2023 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>The MirageOS retreat (01/05/2023)</title>
-      <link>https://blog.osau.re//articles/mirageos_retreat.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/mirageos_retreat.html</guid>
+      <link>https://blog.osau.re/articles/mirageos_retreat.html</link>
+      <description><![CDATA[A little overview of this retreat]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/mirageos_retreat.html</guid>
       <pubDate>Fri, 05 May 2023 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Deploy an SMTP service (3/3)</title>
-      <link>https://blog.osau.re//articles/smtp_3.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/smtp_3.html</guid>
+      <link>https://blog.osau.re/articles/smtp_3.html</link>
+      <description><![CDATA[How to deploy a SMTP service to receive emails]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/smtp_3.html</guid>
       <pubDate>Tue, 03 Jan 2023 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Deploy an SMTP service (2/3)</title>
-      <link>https://blog.osau.re//articles/smtp_2.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/smtp_2.html</guid>
+      <link>https://blog.osau.re/articles/smtp_2.html</link>
+      <description><![CDATA[How to deploy a SMTP service to send emails]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/smtp_2.html</guid>
       <pubDate>Thu, 15 Dec 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Deploy an SMTP service (1/3)</title>
-      <link>https://blog.osau.re//articles/smtp_1.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/smtp_1.html</guid>
+      <link>https://blog.osau.re/articles/smtp_1.html</link>
+      <description><![CDATA[How to deploy your own SMTP service]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/smtp_1.html</guid>
       <pubDate>Tue, 06 Dec 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Reproducibility!</title>
-      <link>https://blog.osau.re//articles/reproducible.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/reproducible.html</guid>
+      <link>https://blog.osau.re/articles/reproducible.html</link>
+      <description><![CDATA[How we can manage reproducibility in OCaml]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/reproducible.html</guid>
       <pubDate>Mon, 14 Nov 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>GADTs and state machine</title>
-      <link>https://blog.osau.re//articles/gadt_and_state_machine.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/gadt_and_state_machine.html</guid>
+      <link>https://blog.osau.re/articles/gadt_and_state_machine.html</link>
+      <description><![CDATA[A little introduction about GADTs]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/gadt_and_state_machine.html</guid>
       <pubDate>Fri, 22 Jul 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Spoke, how to implement a little cryptographic protocol</title>
-      <link>https://blog.osau.re//articles/spoke.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/spoke.html</guid>
+      <link>https://blog.osau.re/articles/spoke.html</link>
+      <description>
+        <![CDATA[A simple how-to to understand how we implement protocols for MirageOS]]>
+      </description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/spoke.html</guid>
       <pubDate>Thu, 02 Jun 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Esperanto, when OCaml meets Cosmopolitan</title>
-      <link>https://blog.osau.re//articles/esperanto.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/esperanto.html</guid>
+      <link>https://blog.osau.re/articles/esperanto.html</link>
+      <description><![CDATA[Build-once Run-anywhere]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/esperanto.html</guid>
       <pubDate>Thu, 05 May 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Pasteur is up!</title>
-      <link>https://blog.osau.re//articles/pasteur.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/pasteur.html</guid>
+      <link>https://blog.osau.re/articles/pasteur.html</link>
+      <description><![CDATA[A description of pasteur with MirageOS 4]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/pasteur.html</guid>
       <pubDate>Thu, 21 Apr 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>optint, 32-bits, 64-bits architecture and optimization</title>
-      <link>https://blog.osau.re//articles/optint.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/optint.html</guid>
+      <link>https://blog.osau.re/articles/optint.html</link>
+      <description>
+        <![CDATA[An introduction about optint, a little library to help you to support 32-bits architecture and 64-bits architecture]]>
+      </description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/optint.html</guid>
       <pubDate>Tue, 12 Apr 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Again, re-update of my blog after 2 years.</title>
-      <link>https://blog.osau.re//articles/blog_requiem.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/blog_requiem.html</guid>
+      <link>https://blog.osau.re/articles/blog_requiem.html</link>
+      <description><![CDATA[A setting in abyme about this blog!]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/blog_requiem.html</guid>
       <pubDate>Mon, 11 Apr 2022 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>All the way down, my blog is re-up!</title>
-      <link>https://blog.osau.re//articles/blog.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/blog.html</guid>
+      <link>https://blog.osau.re/articles/blog.html</link>
+      <description><![CDATA[How the blog works?]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/blog.html</guid>
       <pubDate>Mon, 24 Aug 2020 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Release cycle about SMTP stack</title>
-      <link>https://blog.osau.re//articles/release_cycle_email.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/release_cycle_email.html</guid>
+      <link>https://blog.osau.re/articles/release_cycle_email.html</link>
+      <description><![CDATA[A description of the incoming SMTP stack.]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/release_cycle_email.html</guid>
       <pubDate>Tue, 31 Mar 2020 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Eq(af), timing attack!</title>
-      <link>https://blog.osau.re//articles/eqaf_release.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/eqaf_release.html</guid>
+      <link>https://blog.osau.re/articles/eqaf_release.html</link>
+      <description><![CDATA[A description of the new release of Eq{af}]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/eqaf_release.html</guid>
       <pubDate>Sat, 14 Mar 2020 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Tuyau, the next conduit</title>
-      <link>https://blog.osau.re//articles/tuyau.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/tuyau.html</guid>
+      <link>https://blog.osau.re/articles/tuyau.html</link>
+      <description>
+        <![CDATA[An introduction about `tuyau` which wants to solve the Conduit's problem.]]>
+      </description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/tuyau.html</guid>
       <pubDate>Thu, 27 Feb 2020 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Functor, Application and magick!</title>
-      <link>https://blog.osau.re//articles/functor_magic.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/functor_magic.html</guid>
+      <link>https://blog.osau.re/articles/functor_magic.html</link>
+      <description><![CDATA[A little trick about *functor*]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/functor_magic.html</guid>
       <pubDate>Mon, 17 Feb 2020 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>MirageOS compilation</title>
-      <link>https://blog.osau.re//articles/mirageos_compilation.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/mirageos_compilation.html</guid>
+      <link>https://blog.osau.re/articles/mirageos_compilation.html</link>
+      <description><![CDATA[A little explanation about the MirageOS compilation design]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/mirageos_compilation.html</guid>
       <pubDate>Sat, 08 Feb 2020 00:00:00 GMT</pubDate>
     </item>
     <item>
       <title>Hello World!</title>
-      <link>https://blog.osau.re//articles/hello_world.html</link>
-      <description><![CDATA[no description]]></description>
-      <guid isPermaLink="true">https://blog.osau.re//articles/hello_world.html</guid>
+      <link>https://blog.osau.re/articles/hello_world.html</link>
+      <description><![CDATA[My first article which explains the goal of this blog]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/hello_world.html</guid>
       <pubDate>Thu, 06 Feb 2020 00:00:00 GMT</pubDate>
     </item>
   </channel>
