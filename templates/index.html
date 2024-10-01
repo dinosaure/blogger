@@ -18,9 +18,9 @@
             {%- endfor -%}
         </div>
         <div class="content">
-            <span class="date">{{ article.date.canonical }}</span>
+            <span class="date">{{ article.date.human }}</span>
             <a href="{{ host }}{{ article.url }}">{{ article.title }}</a><br />
-            <p>{{ article.synopsis }}</p>
+            <p>{{ article.description }}</p>
             <div class="bottom">
                 <ul class="tags-list">
                     {%- for tag in article.tags -%}
