@@ -119,9 +119,9 @@ uncensored Internet, it is still slow (given the locality of the servers).
 $ echo &quot;SFR lied to me!?&quot;
 </code></pre>
 <hr />
-<p><strong><tag id="fn1">1</tag></strong>: Note that we offer such a server in the form of a
-unikernel, available here. As well as being small, its attack surface is much
-smaller than that of competitors such as bind9.</p>
+<p><strong><tag id="fn1">1</tag></strong>: Note that we offer such a server in the form of <a href="https://builds.osau.re/job/dns-resolver/build/latest">a
+unikernel</a>, available here. As well as being small, its attack
+surface is much smaller than that of competitors such as bind9.</p>
 <hr />
 <p>So our code from the beginning wouldn't work if we had to connect to a service
 like ygg.re. At least, it wouldn't work on some machines (including mine)
@@ -434,9 +434,10 @@ result with a <code>connect()</code> can sometimes be... <a href="https://jvns.c
 <h2 id="ipv4--ipv6"><a class="anchor" aria-hidden="true" href="#ipv4--ipv6"></a>IPv4 &amp; IPv6</h2>
 <p>One of the problems that has been noted during the transition from IPv4 to IPv6
 is the repeated attempts to reach an IPv6 destination that only fail, taking the
-user back to an IPv4 destination with a considerable delay (IPv6 brokeness).
-There are several solutions to solve this problem (notably at DNS level) but
-happy-eyeballs was a solution that helped to eliminate this problem.</p>
+user back to an IPv4 destination with a considerable delay (<a href="https://en.wikipedia.org/wiki/IPv6_brokenness_and_DNS_whitelisting">IPv6
+brokeness</a>). There are several solutions to solve this problem
+(notably at DNS level) but happy-eyeballs was a solution that helped to
+eliminate this problem.</p>
 <p>The reader might point out that in 2024 almost everything will be IPv6, but
 that's still not the case for me. My (dinosaure) ISP doesn't make IPv6 available
 in my case, so happy-eyeballs may be more than necessary in my case to avoid
