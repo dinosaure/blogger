@@ -5,7 +5,7 @@ maintainer: "romain.calascibetta@gmail.com"
 authors: [ "The XHTMLBoy <xhtmlboi@gmail.com>" ]
 
 build: [
-  [ "dune" "subst" ] {pinned}
+  [ "dune" "subst" ] {dev}
   [ "dune" "build" "-p" name "-j" jobs ]
   [ "dune" "runtest" "-p" name ] {with-test}
   [ "dune" "build" "@doc" "-p" name ] {with-doc}

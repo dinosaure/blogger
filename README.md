@@ -6,14 +6,14 @@ The source code of the generator and the content of my blog, naively using
 - https://blog.osau.re/
 
 The first website uses the GitHub pages mechanism (see the `gh-pages` branch),
-the second is an unikernel with [`unipi`](https://github.com/roburio/unipi) on
+the second is an unikernel with [`unipi`](https://github.com/robur-coop/unipi) on
 my machine (plus [`contruno`](https://github.com/dinosaure/contruno) for TLS).
 
 You can have a local version of my blog with:
 ```sh
 $ opam pin add -y https://github.com/dinosaure/blogger
-$ blogger watch
-$ wget http://localhost:8888/
+$ dune exec bin/watch.exe ---
+$ wget http://localhost:8000/
 ```
 
 The executable is able to push (like `git push`) the website to a Git repository 
@@ -22,7 +22,7 @@ use `ssh` (with recorded private SSH key with `ssh-agent`) to push into a Git
 repository. It can notify an `unipi` unikernel with the `--hook` option (and
 let it to resynchronize values with the new commit).
 ```sh
-$ blogger push -r git@localhost:blog.git --hook http://10.0.0.1/hook \
+$ dune exec bin/push.exe -- -r git@localhost:blog.git --hook http://10.0.0.1/hook \
   [--name "Romain Calascibetta"] \
   [--email romain.calascibetta@gmail.com]
 ```
