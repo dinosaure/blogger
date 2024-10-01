@@ -118,9 +118,9 @@ $ echo "SFR lied to me!?"
 
 <hr />
 
-**<tag id="fn1">1</tag>**: Note that we offer such a server in the form of a
-unikernel, available here. As well as being small, its attack surface is much
-smaller than that of competitors such as bind9.
+**<tag id="fn1">1</tag>**: Note that we offer such a server in the form of [a
+unikernel][dns-resolver], available here. As well as being small, its attack
+surface is much smaller than that of competitors such as bind9.
 
 <hr />
 
@@ -476,9 +476,10 @@ result with a `connect()` can sometimes be... [surprising][surprising]!
 
 One of the problems that has been noted during the transition from IPv4 to IPv6
 is the repeated attempts to reach an IPv6 destination that only fail, taking the
-user back to an IPv4 destination with a considerable delay (IPv6 brokeness).
-There are several solutions to solve this problem (notably at DNS level) but
-happy-eyeballs was a solution that helped to eliminate this problem.
+user back to an IPv4 destination with a considerable delay ([IPv6
+brokeness][ipv6-brokeness]). There are several solutions to solve this problem
+(notably at DNS level) but happy-eyeballs was a solution that helped to
+eliminate this problem.
 
 The reader might point out that in 2024 almost everything will be IPv6, but
 that's still not the case for me. My (dinosaure) ISP doesn't make IPv6 available
@@ -507,3 +508,5 @@ to those who do not develop unikernels. In short, follow us and our work.
 [rr-dns]: https://en.wikipedia.org/wiki/Round-robin_DNS
 [robur.coop]: https://robur.coop/
 [rng]: https://mirage.io/blog/mirage-entropy
+[ipv6-brokeness]: https://en.wikipedia.org/wiki/IPv6_brokenness_and_DNS_whitelisting
+[dns-resolver]: https://builds.osau.re/job/dns-resolver/build/latest
