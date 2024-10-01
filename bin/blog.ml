@@ -282,7 +282,7 @@ module Article = struct
 
   class type t = object ('self)
     method title : string
-    method synopsis : string option
+    method description : string
     method charset : string option
     method tags : string list
     method date : Date.t
@@ -292,11 +292,11 @@ module Article = struct
     method get_host : string option
   end
 
-  class article ~title ?synopsis ?charset ?(tags = []) ~date ~author
+  class article ~title ~description ?charset ?(tags = []) ~date ~author
     ?(co_authors = []) () =
     object (_ : #t)
       method title = title
-      method synopsis = synopsis
+      method description = description
       method charset = charset
       method tags = tags
       method date = date
@@ -308,7 +308,7 @@ module Article = struct
     end
 
   let title p = p#title
-  let synopsis p = p#synopsis
+  let description p = p#description
   let tags p = p#tags
   let date p = p#date
 
@@ -320,7 +320,7 @@ module Article = struct
   let validate fields =
     let open Data.Validation in
     let+ title = required fields "title" string
-    and+ synopsis = optional fields "synopsis" string
+    and+ description = required fields "description" string
     and+ charset = optional fields "charset" string
     and+ tags = optional_or fields ~default:[] "tags" (list_of string)
     and+ date = required fields "date" Date.validate
@@ -329,7 +329,7 @@ module Article = struct
     and+ co_authors =
       optional_or fields ~default:[] "co-authors" (list_of Author.validate)
     in
-    new article ~title ?synopsis ?charset ~tags ~date ~author ~co_authors ()
+    new article ~title ~description ?charset ~tags ~date ~author ~co_authors ()
 
   let validate =
     let open Data.Validation in
@@ -338,7 +338,7 @@ module Article = struct
   let normalize obj =
     Data.
       [
-        ("title", string obj#title); ("synopsis", option string obj#synopsis)
+        ("title", string obj#title); ("description", string obj#description)
       ; ("date", Date.normalize obj#date); ("charset", option string obj#charset)
       ; ("tags", list_of string obj#tags)
       ; ("author", Author.normalize obj#author)
@@ -508,7 +508,7 @@ struct
       end
 
   let feed_title = "The dinosaure's blog"
-  let site_url = "https://blog.osau.re/"
+  let site_url = "https://blog.osau.re"
   let feed_description = "My personnal blog about MirageOS & OCaml"
 
   let fetch_articles =
@@ -527,9 +527,7 @@ struct
       @@ fun (path, article) ->
       let title = Article.title article in
       let link = site_url ^ Yocaml.Path.to_string path in
-      let description =
-        Option.value ~default:"no description" (Article.synopsis article)
-      in
+      let description = Article.description article in
       Rss1.item ~title ~link ~description
     in
     let open Task in
@@ -570,10 +568,7 @@ struct
                     let title = Article.title article in
                     let link = site_url ^ Path.to_string path in
                     let guid = Rss2.guid_from_link in
-                    let description =
-                      Option.value ~default:"no description"
-                        (Article.synopsis article)
-                    in
+                    let description = Article.description article in
                     let pub_date =
                       Datetime.make
                         (Date.to_archetype_date_time (Article.date article))
@@ -612,9 +607,9 @@ struct
               Datetime.make (Date.to_archetype_date_time (Article.date article))
             in
             let categories = List.map Category.make (Article.tags article) in
-            let summary = Option.map Atom.text (Article.synopsis article) in
+            let summary = Atom.text (Article.description article) in
             let links = [ Atom.alternate content_url ~title ] in
-            Atom.entry ~links ~categories ?summary ~updated ~id:content_url
+            Atom.entry ~links ~categories ~summary ~updated ~id:content_url
               ~title:(Atom.text title) ()
         end
     in
