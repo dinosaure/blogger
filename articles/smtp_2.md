@@ -121,7 +121,7 @@ handling, sending and receiving emails.
 ```sh
 $ apt install libcurl4-gnutls-dev
 $ opam pin add -y https://github.com/dinosaure/blaze.git
-$ dd if=/dev/urandom bsd=32 count=1|base64 -
+$ dd if=/dev/urandom bs=32 count=1|base64 -
 iI9jJBB/XLd6r0C1cNobumjKRyMfnGKKb6nYFJ5dD48=
 $ cat >dkim.key <<EOF
 iI9jJBB/XLd6r0C1cNobumjKRyMfnGKKb6nYFJ5dD48=

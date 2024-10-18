@@ -438,7 +438,7 @@ notify our DNS server of such a change so that it can "fetch"/"pull" the
 repository and update the zone file.
 
 ```sh
-$ dd if=/dev/urandom bsd=32 count=1|base64 -
+$ dd if=/dev/urandom bs=32 count=1|base64 -
 s1/eSOziiA+rvScunET9G9sEB6bDcIrHb/HdE2wexhE=
 $ cat >x25519.net._keys <<EOF
 personal._update.x25519.net. DNSKEY 0 3 163 PAPPkecDvEBnhqTzG5Xsbrbi7W0QY7TpVaEMxndMv2M=
