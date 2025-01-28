@@ -9,7 +9,8 @@ guitar and politics. Here is my blog for my notes about MirageOS and OCaml and
 some little notes in French for sure.
 
 You can check what I do on GitHub or on [din.osau.re][din.osau.re]. Finally,
-you can follow me on [twitter][twitter] and [Mastodon][mastodon]. If you want
+you can follow me on [twitter][twitter] and
+<a rel="me" href="https://mastodon.social/@dinosaure">Mastodon</a>. If you want
 to do a epistolary exchange with me, you can send me an email to:
 - romain.calascibetta `@` gmail.com
 - din `@` osau.re
@@ -17,4 +18,3 @@ to do a epistolary exchange with me, you can send me an email to:
 [mirage]: https://mirage.io/
 [din.osau.re]: https://din.osau.re/
 [twitter]: https://twitter.com/Dinoosaure
-[mastodon]: https://mastodon.social/@dinosaure
