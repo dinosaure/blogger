@@ -17,4 +17,4 @@ to do a epistolary exchange with me, you can send me an email to:
 [mirage]: https://mirage.io/
 [din.osau.re]: https://din.osau.re/
 [twitter]: https://twitter.com/Dinoosaure
-[mastodon]: https://mastodon.social/web/@dinosaure
+[mastodon]: https://mastodon.social/@dinosaure
