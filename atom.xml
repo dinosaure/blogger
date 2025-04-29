@@ -3,12 +3,21 @@
   <id>https://blog.osau.re/atom.xml</id>
   <title type="text">The dinosaure&apos;s blog</title>
   <generator uri="https://github.com/xhtmlboi/yocaml" version="2">YOCaml</generator>
-  <updated>2024-09-27T00:00:00Z</updated>
+  <updated>2025-04-29T00:00:00Z</updated>
   <author>
     <name>Romain Calascibetta</name>
   </author>
   <link href="https://blog.osau.re"/>
   <link href="https://blog.osau.re/atom.xml" rel="self"/>
+  <entry>
+    <id>https://blog.osau.re/articles/bstr.html</id>
+    <title type="text">Bstr, a synthetic library for bigstrings</title>
+    <updated>2025-04-29T00:00:00Z</updated>
+    <summary type="text">A small library to manipulate bstr</summary>
+    <link href="https://blog.osau.re/articles/bstr.html" rel="alternate" title="Bstr, a synthetic library for bigstrings"/>
+    <category term="OCaml"/>
+    <category term="Ecosystem"/>
+  </entry>
   <entry>
     <id>https://blog.osau.re/articles/happy_eyeballs.html</id>
     <title type="text">Happy eyeballs?!</title>

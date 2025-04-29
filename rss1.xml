@@ -6,6 +6,7 @@
     <description><![CDATA[My personnal blog about MirageOS & OCaml]]></description>
     <items>
       <rdf:Seq>
+        <rdf:li resource="https://blog.osau.re/articles/bstr.html"/>
         <rdf:li resource="https://blog.osau.re/articles/happy_eyeballs.html"/>
         <rdf:li resource="https://blog.osau.re/articles/lwt_pause.html"/>
         <rdf:li resource="https://blog.osau.re/articles/miou_rules.html"/>
@@ -31,6 +32,11 @@
       </rdf:Seq>
     </items>
   </channel>
+  <item rdf:about="https://blog.osau.re/articles/bstr.html">
+    <title>Bstr, a synthetic library for bigstrings</title>
+    <link>https://blog.osau.re/articles/bstr.html</link>
+    <description><![CDATA[A small library to manipulate bstr]]></description>
+  </item>
   <item rdf:about="https://blog.osau.re/articles/happy_eyeballs.html">
     <title>Happy eyeballs?!</title>
     <link>https://blog.osau.re/articles/happy_eyeballs.html</link>

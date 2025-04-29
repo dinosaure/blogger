@@ -5,9 +5,16 @@
     <link>https://blog.osau.re</link>
     <description><![CDATA[My personnal blog about MirageOS & OCaml]]></description>
     <atom:link href="https://blog.osau.re/feed.xml" rel="self" type="application/rss+xml"/>
-    <lastBuildDate>Fri, 27 Sep 2024 00:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Tue, 29 Apr 2025 00:00:00 GMT</lastBuildDate>
     <docs>https://www.rssboard.org/rss-specification</docs>
     <generator>YOCaml</generator>
+    <item>
+      <title>Bstr, a synthetic library for bigstrings</title>
+      <link>https://blog.osau.re/articles/bstr.html</link>
+      <description><![CDATA[A small library to manipulate bstr]]></description>
+      <guid isPermaLink="true">https://blog.osau.re/articles/bstr.html</guid>
+      <pubDate>Tue, 29 Apr 2025 00:00:00 GMT</pubDate>
+    </item>
     <item>
       <title>Happy eyeballs?!</title>
       <link>https://blog.osau.re/articles/happy_eyeballs.html</link>
