@@ -53,7 +53,6 @@ let () =
   end) in
   Yocaml_git.run
     (module Source)
-    (module Pclock)
     ~context:`SSH ~author ~email ~message ~remote
     (fun () -> Blog.process_all ~host:!host)
   |> Lwt_main.run
