@@ -13,7 +13,7 @@
  (libraries
   fmt.tty
   logs.fmt
-  git-unix
+  git-net.unix
   yocaml
   yocaml_git
   yocaml_syndication

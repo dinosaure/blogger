@@ -32,14 +32,3 @@ depends: [
   "yocaml_jingoo"
   "yocaml_syndication"
 ]
-
-pin-depends: [
-  ["yocaml.dev"             "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
-  ["yocaml_runtime.dev"     "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
-  ["yocaml_unix.dev"        "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
-  ["yocaml_yaml.dev"        "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
-  ["yocaml_cmarkit.dev"     "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
-  ["yocaml_git.dev"         "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
-  ["yocaml_jingoo.dev"      "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
-  ["yocaml_syndication.dev" "git+https://gitlab.com/funkywork/yocaml.git#c2809182a59571a863d6ad14a77f720f6fa577dc" ]
-]
