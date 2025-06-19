@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Dinosaure's website — The 15th MirageOS retreat
+    </title>
+    <meta name="description" content="An overview about the last MirageOS retreat">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/hl.css">
+    <link type="text/css" rel="stylesheet" href="https://dinosaure.github.io/blogger/css/style.css">
+    <script src="https://dinosaure.github.io/blogger/js/hl.js"></script>
+    <link rel="alternate" type="application/rss+xml" href="https://dinosaure.github.io/blogger/feed.xml" title="blog.osau.re">
+    <script type="module">
+      import { LaTeXJSComponent } from "https://cdn.jsdelivr.net/npm/latex.js/dist/latex.mjs"
+      customElements.define("latex-js", LaTeXJSComponent)
+    </script>
+    <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>blog.osau.re</h1>
+      <blockquote>
+        <strong>MirageOS</strong> and <strong>OCaml</strong> stuffs.
+      </blockquote>
+    </header>
+    <main><a href="https://dinosaure.github.io/blogger/index.html">Back to index</a>
+
+<article>
+    <h1>The 15th MirageOS retreat</h1>
+    <ul class="tags-list"><li>OCaml</li><li>MirageOS</li><li>unikernel</li></ul><p>The 2025 MirageOS retreat may be the last one organised in Riad de Marrakech.
+There were more than fifteen participants (which is very good), including old
+regulars and newcomers. As for Robur, a small retreat was organised afterwards
+between the members of our cooperative.</p>
+<p>On this retreat, as usual, I had a fairly ambitious goal: to reimplement
+<a href="https://datatracker.ietf.org/doc/rfc9000/">QUIC</a>. Even though I was well equipped for the task (I had already
+implemented the protocol, all that was missing was the logic), I found myself,
+as usual, working on other projects, helping people and discussing all sorts of
+things not necessarily related to computing (which is also nice).</p>
+<p>And as usual, the stated goals were not achieved, but that's also the charm of
+retreats, where there is spontaneous knowledge sharing, reprioritisation of
+goals, a return to reality about what is possible and what takes time, as well
+as times when we just laugh and chat.</p>
+<p>This article will be divided into six sections:</p>
+<ol>
+<li>First, I would still like to present a project that is taking shape, for
+which I have already established a collaboration, and which lays the
+foundations for what will be necessary next for Robur in the development of
+unikernels.</li>
+<li>There is, of course, all the work, still experimental, on
+<a href="https://github.com/robur-coop/miou-solo5">miou-solo5</a>, in which I tried to involve Antonin, but we
+preferred to drink beer until we couldn't drink anymore (which, in my
+opinion, is more interesting).</li>
+<li>There is still a project, not yet finalised but clearly interesting: a
+<a href="https://github.com/dinosaure/weed">webassembly interpreter</a> integrated into a unikernel.</li>
+<li>I finally got around to &quot;updating&quot; our Git stack with the recent changes
+made to <a href="https://github.com/robur-coop/carton">carton</a> (funded for <a href="https://blog.robur.coop/articles/2025-01-07-carton-and-cachet.html">email archiving</a>). A
+quick review of <a href="https://github.com/mirage/ocaml-git">ocaml-git</a> and <a href="https://github.com/robur-coop/git-kv.git">git-kv</a> is necessary.</li>
+<li>I also embarked on the implementation of the NTP protocol, which mainly
+allowed me to consolidate my knowledge of UDP (necessary for QUIC). A quick
+look back at this small project is also in order.</li>
+<li>Finally, I helped other people with their projects here and there:
+<a href="https://github.com/mirage/dream/pull/1">dream-mirage</a>, <strong>@gasche</strong>'s <a href="https://github.com/sharkdp/hyperfine">hyperfine</a> project,
+discussions on the MirageOS scheduler (with lwt) for <strong>@gasche</strong> and
+<strong>@Armael</strong>, a <a href="https://100r.co/site/uxn.html">uxn</a> interpreter made by <strong>@profpatsch</strong>, and a little
+bit of <a href="https://github.com/robur-coop/mollymawk">mollymawk</a> with <strong>@PizieDust</strong>.</li>
+</ol>
+<p>So I definitely didn't slack off during this retreat!</p>
+<h2 id="a-new-http-stack-httpcats-vif--hurl"><a class="anchor" aria-hidden="true" href="#a-new-http-stack-httpcats-vif--hurl"></a>A new HTTP stack, <a href="https://github.com/robur-coop/httpcats">httpcats</a>, <a href="https://github.com/robur-coop/vif">vif</a> &amp; <a href="https://github.com/robur-coop/hurl">hurl</a></h2>
+<p>I haven't talked much about this project at the retreat, but I think the work
+done with <a href="https://github.com/swrup"><strong>swrup</strong></a> and myself deserves a little explanation.</p>
+<p>I've been hanging around all the HTTP stacks in OCaml for quite some time: I
+worked at <a href="https://github.com/ocsigen">Ocsigen</a>, participated in the development of
+<a href="https://github.com/mirage/ocaml-cohttp">CoHTTP</a>, and also contributed remotely to the use of <a href="https://github.com/inhabitedtype/httpaf">http/af</a>
+and <a href="https://github.com/anmonteiro/ocaml-h2">h2</a>, eventually proposing a <a href="https://github.com/dinosaure/paf-le-chien">paf-le-chien</a> solution that
+is still useful today for unikernels. I also participated in the development of
+<a href="https://github.com/aantron/dream">Dream</a> and integrated some of my libraries, such as
+<a href="https://github.com/dinosaure/multipart_form">multipart_form</a>, into this framework.</p>
+<p>In short, I have a fairly comprehensive view of what can be done with HTTP in
+OCaml. However, I was never really satisfied with the result, despite my efforts
+to participate in the community.</p>
+<p>At this point, there were essentially two things that interested me:</p>
+<ol>
+<li>Unblock the situation with <code>http/af</code> and get <a href="https://github.com/seliopou">Spiros</a>'s agreement to
+fork his project and have a maintained HTTP/1.1 implementation that handles
+connection upgrades.</li>
+<li>Have an HTTP server/client that works with Miou (since that's our scheduler).</li>
+</ol>
+<p>On these two points, it was clear that such initiatives could only come from me.
+So I asked Spiros if I could fork <code>http/af</code>, which resulted in
+<a href="https://github.com/robur-coop/ocaml-h1">ocaml-h1</a>. Spiros and I know each other, and he even participated in
+a retreat at the time. In a private discussion, he understood our constraints
+and allowed us to fork <code>http/af</code>. I wouldn't say that <code>ocaml-h1</code> is strictly
+speaking a continuation of <code>http/af</code>. However, this project was built on a
+social agreement that respects everyone's work (which is already quite
+something!).</p>
+<p>Then I started experimenting with <code>ocaml-h1</code> and <code>ocaml-h2</code> with Miou in order
+to propose <a href="https://github.com/robur-coop/httpcats">httpcats</a>. This time, the goal was to synthesise
+everything we had done at Robur with regard to the HTTP stack (both for our
+unikernels and our applications). To this end, I resumed the work that
+<strong>@hannesm</strong> had started on <a href="https://github.com/robur-coop/http-lwt-client">http-lwt-client</a>, which, in my
+opinion, remains the most <em>efficient</em> HTTP client. In addition, Kate started
+using <code>httpcats</code> and gave me some feedback so that she could implement a
+unikernel for <a href="https://github.com/kit-ty-kate/mirage-torrent">downloading torrents</a>. As development continued,
+I started offering a tool similar to <code>httpie</code> but in OCaml, called <a href="https://github.com/robur-coop/hurl">hurl</a>
+(first proposed by Hannes).</p>
+<style type="text/css">
+.ansi2html-content { white-space: pre-wrap; word-wrap: break-word; font-size: 0.8em; }
+.body_foreground { color: #DCDCCC; }
+.body_background { background-color: #000000; }
+.inv_foreground { color: #000000; }
+.inv_background { background-color: #AAAAAA; }
+.inv_foreground { color: #000000; }
+.inv_background { background-color: #AAAAAA; }
+.ansi1 { font-weight: bold; }
+.ansi32 { color: #60B48A; }
+.ansi34 { color: #506070; }
+.ansi35 { color: #DC8CC3; }
+.ansi36 { color: #8CD0D3; }
+</style>
+<pre class="ansi2html-content">
+<span class="body_foreground">$ hurl https://httpbin.org/post -m POST foo=bar foor==bar -p ish</span>
+<span class="ansi35">3.89.78.94</span>:<span class="ansi32">443</span>
+<span class="ansi34">TLS 1.2</span> (<span class="ansi36">h2</span>) with <span class="ansi35">ECDHE RSA AEAD AES128 GCM</span>
+<span class="ansi36">:status</span>: 200
+<span class="ansi36">date</span>: Tue, 03 Jun 2025 09:07:02 GMT
+<span class="ansi36">content-type</span>: application/json
+<span class="ansi36">content-length</span>: 449
+<span class="ansi36">server</span>: gunicorn/19.9.0
+<span class="ansi36">access-control-allow-origin</span>: *
+<span class="ansi36">access-control-allow-credentials</span>: true
+ 
+<span class="body_foreground">$ hurl https://httpbin.org/post -m POST foo=bar foo==bar -p b | jq</span>
+<span class="ansi1">{</span>
+  <span class="ansi1 ansi34">"args"</span><span class="ansi1">:</span> <span class="ansi1">{</span>
+    <span class="ansi1 ansi34">"foo"</span><span class="ansi1">:</span> <span class="ansi32">"bar"</span>
+  <span class="ansi1">}</span><span class="ansi1">,</span>
+  <span class="ansi1 ansi34">"data"</span><span class="ansi1">:</span> <span class="ansi32">"{\n  \"foo\": \"bar\"\n}"</span><span class="ansi1">,</span>
+  <span class="ansi1 ansi34">"files"</span><span class="ansi1">:</span> <span class="ansi1">{}</span><span class="ansi1">,</span>
+  <span class="ansi1 ansi34">"form"</span><span class="ansi1">:</span> <span class="ansi1">{}</span><span class="ansi1">,</span>
+  <span class="ansi1 ansi34">"headers"</span><span class="ansi1">:</span> <span class="ansi1">{</span>
+    <span class="ansi1 ansi34">"Content-Length"</span><span class="ansi1">:</span> <span class="ansi32">"18"</span><span class="ansi1">,</span>
+    <span class="ansi1 ansi34">"Content-Type"</span><span class="ansi1">:</span> <span class="ansi32">"application/json"</span><span class="ansi1">,</span>
+    <span class="ansi1 ansi34">"Host"</span><span class="ansi1">:</span> <span class="ansi32">"httpbin.org"</span><span class="ansi1">,</span>
+    <span class="ansi1 ansi34">"User-Agent"</span><span class="ansi1">:</span> <span class="ansi32">"hurl/0.0.1-30-g2f2a549"</span><span class="ansi1">,</span>
+    <span class="ansi1 ansi34">"X-Amzn-Trace-Id"</span><span class="ansi1">:</span> <span class="ansi32">"Root=1-683ebb46-486e6acb3c21a3cc5f802d8a"</span>
+  <span class="ansi1">}</span><span class="ansi1">,</span>
+  <span class="ansi1 ansi34">"json"</span><span class="ansi1">:</span> <span class="ansi1">{</span>
+    <span class="ansi1 ansi34">"foo"</span><span class="ansi1">:</span> <span class="ansi32">"bar"</span>
+  <span class="ansi1">}</span><span class="ansi1">,</span>
+  <span class="ansi1 ansi34">"origin"</span><span class="ansi1">:</span> <span class="ansi32">"213.245.183.59"</span><span class="ansi1">,</span>
+  <span class="ansi1 ansi34">"url"</span><span class="ansi1">:</span> <span class="ansi32">"https://httpbin.org/post?foo=bar"</span>
+<span class="ansi1">}</span>
+</pre>
+<p>At this point, we could argue against the emergence of a new HTTP client. There
+are <a href="https://discuss.ocaml.org/t/simple-modern-http-client-library/11239/14?u=dinosaure">pros and cons</a>. What is certain is that our cooperative
+sees the value in it and is committed to offering something that satisfies us.
+Previous contributions to CoHTTP/<a href="https://github.com/mirage/ocaml-conduit">Conduit</a> did not really bear fruit
+(as explained <a href="https://blog.osau.re/articles/blog_requiem.html#conduit-tuyau-cohttp-httpaf-and-paf">here</a>). It was clear to us that we needed
+another HTTP client that would work for our applications and unikernels, and
+some people simply rejected our collaboration on CoHTTP/Conduit, which led us to
+produce our own libraries.</p>
+<p>The next step was to implement an HTTP server. My experience with
+<code>ocsigenserver</code>, <code>cohttp</code>, <code>http/af</code> and <code>paf</code> enabled me to produce something
+fairly quickly. However, one piece was still missing: websockets and upgrading
+an HTTP connection to this protocol. This is where <strong>@swrup</strong> did <a href="https://github.com/robur-coop/httpcats/pull/27">an excellent
+job</a>! We met up several times in Paris and worked together, then shared
+a beer in a small bar near Bastille.</p>
+<p>An interesting point is the various benchmarks I ran with <code>httpcats</code> and the
+comparisons with <code>eio+http/af</code>. The <a href="https://discuss.ocaml.org/t/lwt-multi-processing-much-more-performant-than-eio-multi-core/16395/3?u=dinosaure">latest one from April</a> proves
+that <code>httpcats</code> (and Miou) offers an HTTP server with the lowest latency. It
+would probably take another article to explain this, but the choices that
+structured Miou with the goal of having a scheduler that could implement
+services and unikernels are increasingly being confirmed!</p>
+<style>
+.bench table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse;
+}
+</style>
+<table class="bench">
+<tr><th></th><th>http/af+lwt</th><th>httpun+eio</th><th>httpcats</th></tr>
+<tr><td>8 clients, 8 threads</td><td>19.05us</td><td>327.14us</td><td>32.54us</td></tr>
+<tr><td>512 clients, 32 threads</td><td>8.5ms</td><td>1.88ms</td><td>1.07ms</td></tr>
+<tr><td>16 clients, 16 threads</td><td>29.75us</td><td>808.30us</td><td>39.22us</td></tr>
+<tr><td>32 clients, 32 threads</td><td>39.21us</td><td>1.23ms</td><td>64.83us</td></tr>
+<tr><td>64 clients, 32 threads</td><td>425.44us</td><td>1.26ms</td><td>124.32us</td></tr>
+<tr><td>128 clients, 32 threads</td><td>250.84us</td><td>1.15ms</td><td>263.56us</td></tr>
+<tr><td>256 clients, 32 threads</td><td>2.51ms</td><td>1.25ms</td><td>471.59us</td></tr>
+<tr><td>512 clients, 32 threads</td><td>10.83ms</td><td>1.89ms</td><td>0.98ms</td></tr>
+</table>
+<p>In short, we have completed <code>httpcats</code> with websocket support, and now we want
+to offer a kind of <em>framework</em> for developing websites. We are therefore
+currently developing <a href="https://github.com/robur-coop/vif">Vif</a>.</p>
+<p>The latter is a web framework, but it has the particularity of using Miou. As
+such, and for the sake of completeness, I have started working with
+<strong>@paukerdal</strong> <a href="https://github.com/paurkedal/ocaml-caqti/pull/117">Miou support</a> for <a href="https://github.com/paurkedal/ocaml-caqti">caqti</a>. The idea that
+Miou can easily execute tasks in parallel has also allowed <strong>@paukerdal</strong> to
+find <a href="https://github.com/paurkedal/ocaml-caqti/issues/127">some bugs</a>, as was the case for us with <code>mirage-crypto</code>.</p>
+<p>Another unique feature of Vif is that it takes advantage of recent work by OCaml
+to offer a native <a href="https://github.com/ocaml/ocaml/pull/355"><code>ocamlnat</code></a> REPL. The idea is to be able to write
+an OCaml script that acts as a web server and simply run that script with Vif.
+Of course, Vif is also (and above all) a library that offers several functions
+for implementing your web server.</p>
+<pre><code class="language-ocaml">#require &quot;vif&quot; ;;
+
+open Vif ;;
+
+let default req server () =
+  let field = &quot;content-type&quot; in
+  let* () = Response.add ~field &quot;text/html; charset=utf-8&quot; in
+  let* () = Response.with_string req &quot;Hello World!\n&quot; in
+  Response.respond `OK
+;;
+
+let routes =
+  let open Vif.U in
+  let open Vif.R in
+  let open Vif.T in
+  [ get (rel /?? nil) --&gt; default ]
+;;
+
+let () = Miou_unix.run (Vif.run routes) ;;
+</code></pre>
+<pre><code class="language-shell">$ vif --pid vif.pid main.ml &amp;
+$ hurl http://localhost:8080 -p b
+Hello World!
+$ kill -SIGINT $(cat vif.pid)
+</code></pre>
+<p>Finally, the last special feature is the (perhaps excessive) use of GADTs to
+type the information we want to process in our web server.
+Serialising/deserialising information is a fairly repetitive task when
+developing a web server. Vif therefore proposes using <a href="https://github.com/dbuenzli/jsont">jsont</a> to obtain
+OCaml values from JSON, as well as <code>multipart_form</code>, again with the same idea of
+being able to <a href="https://discuss.ocaml.org/t/ann-release-of-multipart-form-0-2-0/7704"><em>stream</em> files</a>. So there are types in the
+content, but also types in the routes, which is something I really wanted after
+discussing about <a href="https://github.com/Drup/furl">furl</a> with <a href="https://github.com/Drup">@Drup</a>. In short, an entire article
+would be needed to present Vif, but the <a href="https://github.com/robur-coop/vif/tree/master/test/examples">examples</a> available in
+the repository already show what this framework is capable of.</p>
+<p>As such, one of our ambitions for Robur is to update <a href="https://github.com/robur-coop/builder-web">builder-web</a>
+with Vif. The project is still experimental and the API is likely to change, but
+the idea is gradually taking shape.</p>
+<h2 id="miou-solo5--unikernels"><a class="anchor" aria-hidden="true" href="#miou-solo5--unikernels"></a><a href="https://github.com/robur-coop/miou-solo5"><code>miou-solo5</code></a> &amp; unikernels</h2>
+<p>Two years ago, we started the <a href="https://github.com/robur-coop/miou">Miou</a> project: a simple scheduler to
+implement our services and unikernels. Now, <a href="https://github.com/robur-coop/miou-solo5">miou-solo5</a> has
+appeared: a specialisation of the Miou core for <a href="https://github.com/Solo5/solo5">Solo5</a>. The idea is to
+&quot;plug Miou's scheduler with Solo5's <em>hypercalls</em>&quot;. In itself, this work is not
+fundamentally complex; it consists mainly of FFI (and <a href="https://github.com/TheLortex/eio-solo5">eio-solo5</a>
+already exists).</p>
+<p>However, a significant amount of work is required: <a href="https://github.com/mirage/mirage-tcpip">mirage-tcpip</a>.
+Implementing a unikernel (very) often requires a TCP/IP stack. The problem is
+that <code>mirage-tcpip</code> is:</p>
+<ol>
+<li>closely linked to <code>lwt</code> in its operation</li>
+<li>functorised</li>
+</ol>
+<p>These are the two points we would like to reconsider, along with a possible
+change from <code>Cstruct.t</code> to <code>bytes</code>, as we have already done with
+<a href="https://blog.robur.coop/articles/speeding-ec-string.html">mirage-crypto</a>.</p>
+<p>This is ultimately an opportunity to use <a href="https://github.com/robur-coop/utcp">utcp</a>, <strong>@hannesm</strong>' library
+whose state machine has been proven using <a href="https://hol-theorem-prover.org/">HOL4</a>.</p>
+<p>So, with the help of <strong>@reynir</strong>, we experimented with implementing an &quot;echo&quot;
+TCP/IP server with <code>miou-solo5</code>. This involved some groundwork, particularly on
+the IP layer, as we described <a href="https://blog.robur.coop/articles/utcp_and_effects.html">here</a>. We encountered a few bugs,
+but the feedback, particularly on the workflow in the development of the
+unikernel, seems more interesting than what we are used to with the <code>mirage</code>
+tool (<strong>@Willenbrink</strong> could confirm the difficulties that can be encountered
+when using <code>mirage</code> &amp; <code>opam-monorepo</code>).</p>
+<p>In fact, building a unikernel with <code>miou-solo5</code> now only requires <code>dune</code>. The
+files needed (such as <code>manifest.json</code>) to produce the unikernel are generated
+automatically with <code>dune</code>, and a simple <code>dune build ./unikernel.exe</code> is enough
+to obtain the unikernel and run it directly with <code>solo5-hvt</code>.</p>
+<pre><code class="language-ocaml">let () = Miou_solo5.(run []) @@ fun () -&gt;
+  print_endline &quot;Hello World!&quot;
+</code></pre>
+<pre><code class="language-shell">$ cat dune-workspace
+(lang dune 3.0)
+(context (default))
+(context (default
+ (name solo5)
+ (host default)
+ (toolchain solo5)
+ (merlin)
+ (disable_dynamically_linked_foreign_archives true)))
+$ cat dune
+(executable
+ (name main)
+ (modules main)
+ (modes native)
+ (link_flags :standard -cclib &quot;-z solo5-abi=hvt&quot;)
+ (libraries miou-solo5)
+ (foreign_stubs (language c) (names manifest)))
+
+(rule
+ (targets manifest.c)
+ (deps manifest.json)
+ (enabled_if (= %{context_name} &quot;solo5&quot;))
+ (action (run solo5-elftool gen-manifest manifest.json manifest.c)))
+
+(rule
+ (targets manifest.json)
+ (enabled_if (= %{context_name} &quot;solo5&quot;))
+ (action
+  (with-stdout-to manifest.json (run %{exe:main.exe}))))
+$ dune build ./main.exe
+$ solo5-hvt _build/solo5/main.exe --solo5:quiet
+Hello World!
+</code></pre>
+<p>In short, <code>miou-solo5</code> is still a trial balloon, but it remains very
+interesting. I therefore proposed a <a href="https://github.com/robur-coop/miou-solo5/blob/main/slides/retreat.md">short talk</a> during the
+retreat and continued to experiment with the workflow, notably with
+<strong>@MisterDA</strong> and <strong>@zapashcanon</strong> on two different projects.</p>
+<p>We will therefore continue in this direction and ask ourselves the right
+questions based on our experience in developing unikernels in order to propose a
+better workflow. At some point, we will propose a unikernel using OCaml 5 and
+<code>miou-solo5</code> that can offer a service (and a service such as NTP remains a
+feasible objective) and test it in a real context.</p>
+<h3 id="benchmark--profiling"><a class="anchor" aria-hidden="true" href="#benchmark--profiling"></a>Benchmark &amp; profiling</h3>
+<p><strong>@cfcs</strong>, who used to work at Robur, is back! I've been enjoying the long
+conversations I used to have with <strong>@cfcs</strong> at night, just before going to bed.
+We talked a lot about <code>miou-solo5</code> and some considerations on the workflow that
+such a project can now offer in terms of unikernel development.</p>
+<p>However, one issue we had already encountered with <strong>@reynir</strong> is the profiling
+of a unikernel. How can we identify functions that could potentially slow down
+the execution of a unikernel? The problem is that a unikernel exists and runs in
+a different space than the host system, and tools such as <code>perf</code> are unusable.</p>
+<p>My first attempt was to also provide an executable during the compilation of
+the unikernel that could <em>act</em> as a unikernel. All you have to do is specify
+the devices needed for execution and launch the &quot;unikernel&quot; with <code>perf</code>. We have
+metrics, but the problem is that we need to differentiate between the
+<code>miou-solo5</code> used in our executable and the one used in our unikernel, as they
+do not behave in the same way. However, it is essentially the metrics relating
+to our application that interest us, rather than the scheduler itself.</p>
+<pre><code class="language-shell">$ cat profiling.json
+{ &quot;devices&quot;: [],
+  &quot;type&quot;: &quot;miou.solo5.profiling&quot;,
+  &quot;version&quot;: 1 }
+$ MIOU_PROFILING=profiling.json perf record dune exec ./main.exe
+$ perf report
+</code></pre>
+<p>However, <strong>@cfcs</strong> and I discovered the existence of <code>perf-kvm</code>! <strong>@cfcs</strong> set
+to work finding a way to make the unikernel addresses correspond to symbols and
+let <code>perf-kvm</code> collect the metrics and finally render the results of these
+metrics understandable to humans according to the layout of the unikernel. He
+ended up with a convincing result with <code>miou-solo5</code> and a series of black magic
+commands such as <code>nm</code> and a particularly well-ordered set of options for
+<code>perf-kvm</code>.</p>
+<h2 id="a-webassembly-interpreter-as-a-unikernel"><a class="anchor" aria-hidden="true" href="#a-webassembly-interpreter-as-a-unikernel"></a>A WebAssembly interpreter as a unikernel</h2>
+<p><strong>@zapashcanon</strong> has just finished his <a href="https://arxiv.org/abs/2412.06391">thesis</a> on the symbolic execution of WebAssembly (Wasm) OCaml. I invite you to read his thesis and watch <a href="https://www.youtube.com/watch?v=x6V-NJ9agjg">and old talk</a>. He gave us a more recent talk where he explains how he found a bug in Rust and <a href="https://typst.app/">Typst</a> concerning floats.</p>
+<p>During his thesis, he implemented an interpreter that performs concrete, symbolic, or concolic execution of Wasm: in other words, you can execute Wasm in OCaml thanks to <a href="https://github.com/OCamlPro/owi">Owi</a>.</p>
+<p>The idea was to integrate this interpreter into an unikernel. We would pass the Wasm code through a &quot;block device&quot; and let our unikernel execute the code. The idea is very interesting, so we first tried to link the <code>owi</code> code with an unikernel.</p>
+<p>This took us a day because we had to remove all instances of the <code>Unix</code> module (<strong>@zapashcanon</strong> had already done most of the work, only a few functions were missing).</p>
+<p>Then <strong>@zapashcanon</strong> was able to execute some fairly simple Wasm code in the unikernel! I think it was a factorial. This confirmed that:</p>
+<ol>
+<li>the concrete execution was working;</li>
+<li>we could start thinking about running slightly more complex code.</li>
+</ol>
+<p>So we went for <a href="https://www.sqlite.org/">SQLite</a>! Perhaps a little too complex, but there is an
+<a href="https://sqlite.org/wasm/doc/trunk/demo-123.md">export of the SQLite code to Wasm</a>, and we wanted to see:</p>
+<ol>
+<li>what SQLite needs (<code>malloc(3)</code>, <code>mmap(3)</code>, <code>read(3)</code>, etc.);</li>
+<li>what SQLite exports for use.</li>
+</ol>
+<pre><code class="language-shell-session">$ wasm2wat sqlite3.wasm &gt; sqlite3.wat
+$ rg &quot;import&quot; sqlite3.wat
+(import &quot;env&quot; &quot;__syscall_faccessat&quot; (func (;0;) (type 6)))
+(import &quot;wasi_snapshot_preview1&quot; &quot;fd_close&quot; (func (;1;) (type 1)))
+(import &quot;env&quot; &quot;emscripten_date_now&quot; (func (;2;) (type 39)))
+(import &quot;env&quot; &quot;_emscripten_get_now_is_monotonic&quot; (func (;3;) (type 15)))
+(import &quot;env&quot; &quot;emscripten_get_now&quot; (func (;4;) (type 39)))
+(import &quot;env&quot; &quot;__syscall_fchmod&quot; (func (;5;) (type 0)))
+(import &quot;env&quot; &quot;__syscall_chmod&quot; (func (;6;) (type 0)))
+(import &quot;env&quot; &quot;__syscall_fchown32&quot; (func (;7;) (type 2)))
+(import &quot;env&quot; &quot;__syscall_fcntl64&quot; (func (;8;) (type 2)))
+(import &quot;env&quot; &quot;__syscall_openat&quot; (func (;9;) (type 6)))
+(import &quot;env&quot; &quot;__syscall_ioctl&quot; (func (;10;) (type 2)))
+(import &quot;wasi_snapshot_preview1&quot; &quot;fd_write&quot; (func (;11;) (type 6)))
+(import &quot;wasi_snapshot_preview1&quot; &quot;fd_read&quot; (func (;12;) (type 6)))
+(import &quot;env&quot; &quot;__syscall_fstat64&quot; (func (;13;) (type 0)))
+(import &quot;env&quot; &quot;__syscall_stat64&quot; (func (;14;) (type 0)))
+(import &quot;env&quot; &quot;__syscall_newfstatat&quot; (func (;15;) (type 6)))
+(import &quot;env&quot; &quot;__syscall_lstat64&quot; (func (;16;) (type 0)))
+(import &quot;wasi_snapshot_preview1&quot; &quot;fd_sync&quot; (func (;17;) (type 1)))
+(import &quot;env&quot; &quot;__syscall_ftruncate64&quot; (func (;18;) (type 11)))
+(import &quot;env&quot; &quot;__syscall_getcwd&quot; (func (;19;) (type 0)))
+(import &quot;wasi_snapshot_preview1&quot; &quot;environ_sizes_get&quot; (func (;20;) (type 0)))
+(import &quot;wasi_snapshot_preview1&quot; &quot;environ_get&quot; (func (;21;) (type 0)))
+(import &quot;wasi_snapshot_preview1&quot; &quot;fd_seek&quot; (func (;22;) (type 21)))
+(import &quot;env&quot; &quot;__syscall_mkdirat&quot; (func (;23;) (type 2)))
+(import &quot;env&quot; &quot;_tzset_js&quot; (func (;24;) (type 8)))
+(import &quot;env&quot; &quot;_localtime_js&quot; (func (;25;) (type 64)))
+(import &quot;env&quot; &quot;_munmap_js&quot; (func (;26;) (type 35)))
+(import &quot;env&quot; &quot;_mmap_js&quot; (func (;27;) (type 47)))
+(import &quot;env&quot; &quot;__syscall_readlinkat&quot; (func (;28;) (type 6)))
+(import &quot;env&quot; &quot;__syscall_rmdir&quot; (func (;29;) (type 1)))
+(import &quot;env&quot; &quot;__syscall_unlinkat&quot; (func (;30;) (type 2)))
+(import &quot;env&quot; &quot;__syscall_utimensat&quot; (func (;31;) (type 6)))
+(import &quot;wasi_snapshot_preview1&quot; &quot;fd_fdstat_get&quot; (func (;32;) (type 0)))
+(import &quot;env&quot; &quot;emscripten_resize_heap&quot; (func (;33;) (type 1)))
+</code></pre>
+<p><strong>@zapashcanon</strong> extracted the functions needed by SQLite, and now it was a matter of implementing them. The concrete execution of the code would therefore need a module implementing the functions required by SQLite (basically POSIX), and these are typed using a GADT (thanks <strong>@chambart</strong>). We first implemented these functions with an <code>assert false</code>.</p>
+<p>Finally, thanks to <code>owi</code> again, we can request to execute a specific function that SQLite exports, so we tried <a href="https://www.sqlite.org/c3ref/open.html"><code>sqlite3_open</code></a>. We also needed to prepare some allocations for SQLite, so we used <code>malloc(3)</code>.</p>
+<p>At this point, we started to see something interesting. We observed what SQLite wanted to do and implemented the entire execution path so that SQLite could generate a random number using <a href="https://github.com/mirage/mirage-crypto">mirage-crypto</a> under the hood.</p>
+<p>Due to time constraints, we couldn't go any further. But we did the bulk of the work. Now we need to implement the functions required by SQLite one by one. In total, SQLite only requires about thirty functions. That's not very many, and even though there are functions like <code>ioctl</code> and <code>mkdir</code>, SQLite3 ultimately only needs one file. The idea of a file system is not fundamentally required.</p>
+<p>The project is available here: <a href="https://github.com/dinosaure/weed">weed</a>. The prospects for this project are very interesting. It is conceivable to execute Wasm code <em>on demand</em> in a closed environment such as a unikernel. We will therefore try to take this further with <strong>@zapashcanon</strong>!</p>
+<h2 id="ocaml-git-git-kv-and-the-old-version-of-me"><a class="anchor" aria-hidden="true" href="#ocaml-git-git-kv-and-the-old-version-of-me"></a><a href="https://github.com/mirage/ocaml-git"><code>ocaml-git</code></a>, <a href="https://github.com/robur-coop/git-kv.git"><code>git-kv</code></a> and the old version of me</h2>
+<p>It can be quite dizzying at times to see the work you've done after 10 years in the OCaml community. One of the projects I've worked on the most is <a href="https://github.com/mirage/ocaml-git">ocaml-git</a>.</p>
+<p>My first task was to generate a PACK file so that we could clone, fetch or push to a Git repository. This also involved implementing the <a href="https://github.com/git/git/blob/master/Documentation/gitprotocol-pack.adoc">Smart protocol</a> and negotiation between two Git instances.</p>
+<p>This work was interesting but probably driven by all kinds of experiments so that <a href="https://github.com/mirage/ocaml-git">ocaml-git</a> could still be integrated into a unikernel. There were several abstraction issues:</p>
+<ul>
+<li>abstraction of the scheduler</li>
+<li>abstraction of the hash algorithm</li>
+<li>abstraction of the protocol underlying the transmission of Smart packets</li>
+</ul>
+<p>As such, <code>ocaml-git</code> was more of a space for iterating on several abstraction techniques (functors, first class modules, record as first class modules, <a href="https://www.cl.cam.ac.uk/~jdy22/papers/lightweight-higher-kinded-polymorphism.pdf">HKT</a> or <a href="https://github.com/dinosaure/mimic">mimic</a>). Some of these techniques proved their usability, while others did not. This is particularly the case for functors and <a href="https://www.cl.cam.ac.uk/~jdy22/papers/lightweight-higher-kinded-polymorphism.pdf">High Kinded Polymorphism</a>.</p>
+<p>The problem is that I recently decided to update <a href="https://github.com/robur-coop/carton">carton</a> (which manages PACK files) and it got rid of functors and HKT. So I had to extend this work to <code>ocaml-git</code> in order to deploy our unikernel <a href="https://github.com/robur-coop/opam-mirror">opam-mirror</a> for the retreat.</p>
+<p>So I started this work, but the more I progressed, the harder it was to see the
+benefit for <code>ocaml-git</code>. On the other hand, I also developed <a href="https://github.com/robur-coop/git-kv.git">git-kv</a>,
+which offers a much simpler and more practical API. This is the library we use
+for <code>opam-mirror</code>.</p>
+<p>Basically, we have <code>carton</code>, which allows us to manipulate PACK files. This
+library is used by <code>ocaml-git</code>, which implements all the logic of the Smart
+protocol as well as the Git object format. Finally, we have <code>git-kv</code>, which
+offers a much simpler API than <code>ocaml-git</code> but is based on <code>ocaml-git</code>.</p>
+<p><code>ocaml-git</code> has other constraints, such as being used by <a href="https://github.com/mirage/irmin">Irmin</a>.
+However, in practice, we are only interested in <code>git-kv</code>. Ultimately, wouldn't
+it be interesting to &quot;remove&quot; <code>ocaml-git</code>? So I repatriated the essentials of
+<code>ocaml-git</code> (the protocol and the Git object format) into <code>git-kv</code> so that the
+latter no longer depends on <code>ocaml-git</code>. It took me quite a bit of time, but
+after two days of trying to get the project to compile, I finally got <code>git-kv</code>
+back without <code>ocaml-git</code>, and all the tests we implemented worked like a charm!</p>
+<pre><code class="language-ocaml">let or_fail = function
+  | Ok value -&gt; value
+  | Error (#Git_kv.error as err) -&gt; Fmt.failwith &quot;%a&quot; Git_kv.pp_error err
+
+(* How to push a new file [/foo] into a Git repository. *)
+let run () =
+  let* ctx = Git_net_unix.ctx (Happy_eyeballs_lwt.create ()) in
+  let* store = Git_kv.connect ctx &quot;git@github.com:robur-coop/git-kv.git&quot; in
+  let* result = Git_kv.change_and_push store @@ fun store -&gt;
+    let* result = Git_kv.set store (k &quot;/foo&quot;) &quot;Hello World!&quot; in
+    let () = or_fail result in
+    Lwt.return_unit in
+  let () = or_fail result in
+  Lwt.return_unit
+</code></pre>
+<p>In the end, I avoided the regression that I could have easily convinced myself
+would happen if it were just <code>ocaml-git</code>. I also removed the functors and HKT
+without any problems. So now we have a small library, <code>git-kv</code>, which does the
+essentials: clone, fetch, push, and keep a Git repository in memory in the
+context of unikernels.</p>
+<p><strong>@hannesm</strong> and I finally tried <code>opam-mirror</code> again with the new version of
+<code>git-kv</code> and, after a few minor bugs, everything worked! It was just a shame
+that we couldn't launch <code>opam-mirror</code> until the end of the retreat. We use it
+in particular to limit Internet consumption when downloading software via OPAM.</p>
+<p>This experience also confirms that I am much more comfortable with OCaml and
+have more confidence in myself when it comes to making design and API choices.
+So thank you, <a href="https://github.com/mirage/ocaml-git">ocaml-git</a>!</p>
+<h2 id="udp-ntp-protocol--unikernel"><a class="anchor" aria-hidden="true" href="#udp-ntp-protocol--unikernel"></a>UDP, NTP protocol &amp; unikernel</h2>
+<p>One unikernel that could be interesting is a secondary NTP server. The NTP
+protocol is fairly simple, consisting of a UDP packet that can take the form of
+a request (between a client and a server) or a response (between a server and a
+client).</p>
+<pre><code class="language-ocaml">type t =
+  { flags : int
+  ; stratum : stratum
+  ; poll : int
+  ; precision : int
+  ; root_delay : int32
+  ; root_dispersion : int32
+  ; refid : int32
+  ; reference_ts : Ptime.t option
+  ; origin_ts : Ptime.t option
+  ; recv_ts : Ptime.t option
+  ; trans_ts : Ptime.t option }
+</code></pre>
+<p>This requires implementation of the UDP protocol, which is also fairly simple.
+If you have followed my article <a href="https://blog.robur.coop/articles/utcp_and_effects.html">on TCP and miou-solo5</a>, the
+layers underlying UDP are already available. All that remains is to specify the
+ports and build the packet.</p>
+<pre><code class="language-ocaml">type state
+
+val create : IPv4.t -&gt; state
+
+val recvfrom :
+     state
+  -&gt; ?src:Ipaddr.V4.t
+  -&gt; port:int
+  -&gt; ?off:int
+  -&gt; ?len:int
+  -&gt; bytes
+  -&gt; int * (Ipaddr.V4.t * int)
+
+val sendto :
+     state
+  -&gt; dst:Ipaddr.V4.t
+  -&gt; ?src_port:int
+  -&gt; port:int
+  -&gt; ?off:int
+  -&gt; ?len:int
+  -&gt; string
+  -&gt; (unit, [&gt; `Route_not_found ]) result
+
+val handler : state -&gt; IPv4.packet * IPv4.payload -&gt; unit
+</code></pre>
+<p>The difficulty with the NTP protocol lies not so much in the protocol itself
+but in how the results are interpreted. The basic idea is quite simple. It
+consists of recording the time the NTP packet is sent (\(t_{1}\))and the time
+it is received (\(t_{4}\)). This received NTP packet contains the time
+according to the primary server, and a calculation must be made to determine our
+time difference (where \(t_{2}\) and \(t_{3}\) correspond to <code>rx.recv_ts</code>
+and <code>rx.trans_ts</code>).</p>
+<p>$${\displaystyle \theta ={\frac {(t_{1}-t_{0})+(t_{2}-t_{3})}{2}}}$$</p>
+<p>Now, there may be several issues with this method, which is the main one for
+recalibrating our clock (a task I had already started [here][utime]). Since the
+packet comes from the network, there may be delays (dividing by 2 is based on
+the idea that the sending time is equal to the receiving time, which is not
+really the case).</p>
+<p>Furthermore, we may not necessarily trust the time given by a primary server,
+but rather multiply the sources of information and combine them.</p>
+<p>In this regard, a comparative analysis of the sources via linear regression
+would allow us to choose the best source of information. This shows above all
+that the complexity of the NTP protocol mainly concerns the underlying
+algorithms for choosing the right source and recalibrating the unikernel clock.
+I will therefore continue working on this topic and will certainly write an
+article about it later.</p>
+<p>At least the UDP protocol is implemented, which was necessary for my initial
+goal of implementing QUIC.</p>
+<h2 id="others-projects"><a class="anchor" aria-hidden="true" href="#others-projects"></a>Others projects</h2>
+<p>The retreat is also (and above all) a time for mutual support. Even though I am
+focused on project development, I have also helped people around me (as best I
+can) to move forward with their projects.</p>
+<h3 id="mirage-www-and-dream"><a class="anchor" aria-hidden="true" href="#mirage-www-and-dream"></a>mirage-www and dream</h3>
+<p>Having partly <a href="https://github.com/aantron/dream/pull/119">supported Mirage for Dream</a>, I worked with <strong>@hannesm</strong>
+to help <strong>@Willenbrink</strong> revive the <a href="https://github.com/mirage/mirage-www"><code>mirage-www</code></a> project and
+ensure that it compiles. I hope that <strong>@Willenbrink</strong> has a clear understanding
+of the current state of <code>mirage-www</code>, but above all, he has shown patience and
+a willingness to listen in order to achieve his goal without getting
+discouraged.</p>
+<p>The problems encountered are well known and concern
+<a href="https://github.com/tarides/opam-monorepo"><code>opam-monorepo</code></a> in particular. I should perhaps write an
+article on this subject to explain its origins...</p>
+<p>In any case, his work was completed after quite a battle with <code>opam-monorepo</code>,
+and he finally managed to compile a unikernel with Dream!</p>
+<h3 id="progress-and-gasche"><a class="anchor" aria-hidden="true" href="#progress-and-gasche"></a><a href="https://github.com/CraigFe/progress"><code>progress</code></a> and <strong>@gasche</strong></h3>
+<p><strong>gasche</strong> is developing a small tool, a bit like <a href="https://github.com/sharkdp/hyperfine"><code>hyperfine</code></a>, to
+obtain metrics on the execution time of a program. One aspect of <code>hyperfine</code> is,
+of course, the way it displays the work in progress via a progress bar!</p>
+<p>That's when I advised him to use <a href="https://github.com/CraigFe/progress"><code>progress</code></a>, a library developed by
+<strong>@CraigFe</strong> that I maintain today. He quickly found some bugs (as always) and
+proposed <a href="https://github.com/craigfe/progress/pull/48">a patch</a>.</p>
+<h3 id="uxn-and-solo5"><a class="anchor" aria-hidden="true" href="#uxn-and-solo5"></a><a href="https://100r.co/site/uxn.html">UXN</a> and Solo5</h3>
+<p><strong>@profpatsch</strong> alrady did some retreats before. However, he is not actively
+involved in OCaml. That's also part of the magic of retreats: talking to people
+who are somewhat outside the world of OCaml.</p>
+<p>In fact, he had an idea in mind when he saw the work <strong>@zapashcanon</strong> and I were
+starting on a WebAssembly interpreter in the form of a unikernel, and he
+started interpreting <a href="https://100r.co/site/uxn.html">UXN</a> (which I discovered thanks to him).</p>
+<p>So I gave him a few pointers about Solo5, and he ended up creating a C
+unikernel that can interpret UXN with Solo5!</p>
+<h2 id="conclusion"><a class="anchor" aria-hidden="true" href="#conclusion"></a>Conclusion</h2>
+<p>This article is clearly not exhaustive of everything that happened during the
+retreat. Several people gave talks on topics not necessarily related to OCaml,
+which were very interesting.</p>
+<p>Others worked on projects that I didn't necessarily participate in, but I'll
+leave them the opportunity to write an article like mine.</p>
+<p>What is certain is that everyone was satisfied at the end. The retreat remains
+a very good experience, and we can thank Hannes and Hana for taking the time to
+organise it. In short, we will continue this experience in the coming years.
+There are some challenges ahead (such as renting a venue), but we can work
+together to find a solution — at least, that would be in keeping with the spirit
+of the retreat.</p>
+
+    </article>
+
+        </main>
+    <footer>
+        <a href="https://github.com/xhtmlboi/yocaml">Powered by <strong>YOCaml</strong></a>
+        <br />
+        Hey, this site is part of <a href="https://ring.muhokama.fun">ring.muhokama.fun!</a><br />
+        <a href="https://ring.muhokama.fun/u/dinosaure/pred">Previous</a> 
+        | <a href="https://ring.muhokama.fun/u/dinosaure/succ">Next</a>
+        <br />
+    </footer>
+    <script>hljs.highlightAll();</script>
+  </body>
+</html>
