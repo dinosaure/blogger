@@ -429,7 +429,6 @@ struct
     let index = Path.(source_root / "pages" / "index.md")
     let templates = Path.(source_root / "templates")
     let template file = Path.(templates / file)
-    let binary = Path.rel [ Sys.argv.(0) ]
     let cache = Path.(source_root / "_cache")
   end
 
@@ -461,8 +460,7 @@ struct
     let open Task in
     Action.write_static_file file_target
       begin
-        Pipeline.track_file Source.binary
-        >>> Yocaml_yaml.Pipeline.read_file_with_metadata (module Article) file
+        Yocaml_yaml.Pipeline.read_file_with_metadata (module Article) file
         >>* (fun (obj, str) -> Eff.return (obj#with_host host, str))
         >>> Yocaml_cmarkit.content_to_html ()
         >>> Yocaml_jingoo.Pipeline.as_template
@@ -493,7 +491,7 @@ struct
 
     Action.write_static_file file_target
       begin
-        Pipeline.track_files [ Source.binary; Source.articles ]
+        Pipeline.track_files [ Source.articles ]
         >>> Yocaml_yaml.Pipeline.read_file_with_metadata (module Page) file
         >>> Yocaml_cmarkit.content_to_html ()
         >>> first compute_index
@@ -513,7 +511,7 @@ struct
 
   let fetch_articles =
     let open Task in
-    Pipeline.track_files [ Source.binary; Source.articles ]
+    Pipeline.track_files [ Source.articles ]
     >>> Articles.fetch
           (module Yocaml_yaml)
           ~where:(Path.has_extension "md")

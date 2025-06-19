@@ -12,6 +12,11 @@
     <link type="text/css" rel="stylesheet" href="{{ host }}/css/style.css">
     <script src="{{ host }}/js/hl.js"></script>
     <link rel="alternate" type="application/rss+xml" href="{{ host }}/feed.xml" title="blog.osau.re">
+    <script type="module">
+      import { LaTeXJSComponent } from "https://cdn.jsdelivr.net/npm/latex.js/dist/latex.mjs"
+      customElements.define("latex-js", LaTeXJSComponent)
+    </script>
+    <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   </head>
   <body>
     <header>

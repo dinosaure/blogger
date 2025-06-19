@@ -17,7 +17,7 @@ let reporter ppf =
 
 let () = Fmt_tty.setup_std_outputs ~style_renderer:`Ansi_tty ~utf_8:true ()
 let () = Logs.set_reporter (reporter Fmt.stdout)
-(* let () = Logs.set_level ~all:true (Some Logs.Debug) *)
+let () = Logs.set_level ~all:true (Some Logs.Debug)
 let author = ref "Romain Calascibetta"
 let email = ref "romain.calascibetta@gmail.com"
 let message = ref "Pushed by YOCaml 2"
